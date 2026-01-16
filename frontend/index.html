@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tamsilcms SIEM Dashboard</title>
+    <link rel="stylesheet" href="static/css/styles.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="brand">
+            <span class="brand__accent"></span>
+            <div>
+                <h1>Tamsilcms SIEM</h1>
+                <p>Endpoint visibility in real time</p>
+            </div>
+        </div>
+        <div class="status-card">
+            <span class="status-pill">Live</span>
+            <span class="status-text" id="status-text">Awaiting data</span>
+        </div>
+    </header>
+
+    <main class="layout">
+        <section class="panel">
+            <div class="panel__header">
+                <h2>Agents</h2>
+                <button class="button" id="refresh-agents">Refresh</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Agent ID</th>
+                            <th>Hostname</th>
+                            <th>OS</th>
+                            <th>Last Seen</th>
+                            <th>Log Count</th>
+                        </tr>
+                    </thead>
+                    <tbody id="agents-table"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel panel--wide">
+            <div class="panel__header">
+                <h2>Log Stream</h2>
+                <div class="filters">
+                    <input type="text" id="search" placeholder="Search messages">
+                    <input type="text" id="agent-filter" placeholder="Agent ID">
+                    <input type="text" id="source-filter" placeholder="Log source">
+                    <select id="level-filter">
+                        <option value="">All levels</option>
+                        <option value="INFO">INFO</option>
+                        <option value="WARN">WARN</option>
+                        <option value="ERROR">ERROR</option>
+                    </select>
+                    <button class="button" id="refresh-logs">Refresh</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Agent</th>
+                            <th>Source</th>
+                            <th>Level</th>
+                            <th>Event</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table"></tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <button class="button button--ghost" id="prev-page">Previous</button>
+                <span id="page-indicator">Page 1</span>
+                <button class="button" id="next-page">Next</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="static/js/app.js"></script>
+</body>
+</html>
