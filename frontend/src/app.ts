@@ -1,32 +1,52 @@
-// Compiled output placeholder. Run `npm run build` in /frontend to regenerate from src/app.ts.
 const apiBase = window.localStorage.getItem("siemApiBase") || "http://localhost:8080/api/v1";
 let page = 0;
 const pageSize = 50;
 
-const statusText = document.getElementById("status-text");
-const agentsTable = document.getElementById("agents-table");
-const logsTable = document.getElementById("logs-table");
-const pageIndicator = document.getElementById("page-indicator");
+const statusText = document.getElementById("status-text") as HTMLSpanElement;
+const agentsTable = document.getElementById("agents-table") as HTMLTableSectionElement;
+const logsTable = document.getElementById("logs-table") as HTMLTableSectionElement;
+const pageIndicator = document.getElementById("page-indicator") as HTMLSpanElement;
 
-const searchInput = document.getElementById("search");
-const agentFilter = document.getElementById("agent-filter");
-const sourceFilter = document.getElementById("source-filter");
-const levelFilter = document.getElementById("level-filter");
+const searchInput = document.getElementById("search") as HTMLInputElement;
+const agentFilter = document.getElementById("agent-filter") as HTMLInputElement;
+const sourceFilter = document.getElementById("source-filter") as HTMLInputElement;
+const levelFilter = document.getElementById("level-filter") as HTMLSelectElement;
 
-const refreshAgentsButton = document.getElementById("refresh-agents");
-const refreshLogsButton = document.getElementById("refresh-logs");
-const prevButton = document.getElementById("prev-page");
-const nextButton = document.getElementById("next-page");
+const refreshAgentsButton = document.getElementById("refresh-agents") as HTMLButtonElement;
+const refreshLogsButton = document.getElementById("refresh-logs") as HTMLButtonElement;
+const prevButton = document.getElementById("prev-page") as HTMLButtonElement;
+const nextButton = document.getElementById("next-page") as HTMLButtonElement;
 
-const fetchJson = async (path) => {
+interface AgentResponse {
+    id: string;
+    hostname: string;
+    os_type: string;
+    os_version: string;
+    created_at: string;
+    last_seen: string | null;
+    log_count: string;
+}
+
+interface LogResponse {
+    id: number;
+    agent_id: string;
+    log_source: string;
+    event_time: string;
+    received_at: string;
+    event_level: string;
+    event_id: string;
+    message: string;
+}
+
+const fetchJson = async <T>(path: string): Promise<T> => {
     const response = await fetch(`${apiBase}${path}`);
     if (!response.ok) {
         throw new Error("Failed request");
     }
-    return response.json();
+    return response.json() as Promise<T>;
 };
 
-const renderAgents = (agents) => {
+const renderAgents = (agents: AgentResponse[]): void => {
     agentsTable.innerHTML = "";
     agents.forEach((agent) => {
         const row = document.createElement("tr");
@@ -41,7 +61,7 @@ const renderAgents = (agents) => {
     });
 };
 
-const renderLogs = (logs) => {
+const renderLogs = (logs: LogResponse[]): void => {
     logsTable.innerHTML = "";
     logs.forEach((log) => {
         const row = document.createElement("tr");
@@ -58,7 +78,7 @@ const renderLogs = (logs) => {
     statusText.textContent = logs.length ? "Receiving events" : "Awaiting data";
 };
 
-const buildLogQuery = () => {
+const buildLogQuery = (): string => {
     const params = new URLSearchParams({
         limit: pageSize.toString(),
         offset: (page * pageSize).toString(),
@@ -80,13 +100,13 @@ const buildLogQuery = () => {
     return `?${params.toString()}`;
 };
 
-const loadAgents = async () => {
-    const data = await fetchJson("/agents?limit=50&offset=0");
+const loadAgents = async (): Promise<void> => {
+    const data = await fetchJson<AgentResponse[]>("/agents?limit=50&offset=0");
     renderAgents(data);
 };
 
-const loadLogs = async () => {
-    const data = await fetchJson(`/logs${buildLogQuery()}`);
+const loadLogs = async (): Promise<void> => {
+    const data = await fetchJson<LogResponse[]>(`/logs${buildLogQuery()}`);
     renderLogs(data);
     pageIndicator.textContent = `Page ${page + 1}`;
 };

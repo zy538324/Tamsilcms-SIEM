@@ -1,7 +1,7 @@
 # Tamsilcms SIEM (Low-Level Foundation)
 
 ## Project Overview
-This repository provides a minimal, production-minded SIEM foundation consisting of a log collector agent, a secure ingestion API, and a simple dashboard backed by PostgreSQL. The design is deliberately lean: collect, validate, store, and display logs with no enrichment or alerting at this stage.
+This repository delivers a low-level SIEM foundation built for secure ingestion, durable storage, and clear operator visibility. The architecture remains deliberately lean: a C# log shipper, a Node.js (TypeScript) ingestion API, PostgreSQL storage, and a modern dashboard for reading logs with filters and pagination.
 
 ## Architecture
 ```
@@ -9,7 +9,7 @@ This repository provides a minimal, production-minded SIEM foundation consisting
    |
    | (JSON events over HTTPS)
    v
-[ Ingestion API (FastAPI) ]
+[ Ingestion API (Node.js / Fastify) ]
    |
    | (validated, normalised events)
    v
@@ -17,13 +17,13 @@ This repository provides a minimal, production-minded SIEM foundation consisting
    |
    | (SQL queries)
    v
-[ Dashboard (HTML/CSS/JS) ]
+[ Dashboard (HTML/CSS/TypeScript) ]
 ```
 
 ## Components
-- **Agent (Python)**: Reads local log files, batches events, and sends them securely with retry and spooling.
-- **Backend (FastAPI)**: Authenticates agents via API key, validates payloads, and writes logs to PostgreSQL.
-- **Dashboard (HTML/CSS/JS)**: Presents log stream and agent list with pagination and filtering.
+- **Agent (C#/.NET 8)**: Reads local log files, batches events, and sends them securely with retry and spooling.
+- **Backend (Fastify + TypeScript)**: Authenticates agents via API key, validates payloads, and writes logs to PostgreSQL.
+- **Dashboard (HTML/CSS/TypeScript)**: Presents log stream and agent list with filtering and pagination.
 
 ## Local Development
 1. Copy the environment template.
@@ -41,26 +41,27 @@ This repository provides a minimal, production-minded SIEM foundation consisting
 4. Run the backend API.
    ```bash
    cd backend
-   pip install -r requirements.txt
-   uvicorn app.main:app --host 0.0.0.0 --port 8080
+   npm install
+   npm run dev
    ```
-5. Serve the dashboard (optional for local browsing).
+5. Build and serve the dashboard.
    ```bash
    cd frontend
+   npm install
+   npm run build
    python -m http.server 8000
    ```
 
 ## Agent Setup
-1. Copy the agent environment template (or export environment variables).
+1. Export the agent environment variables (or set them in your service manager).
 2. Run the agent:
    ```bash
-   cd agent
-   pip install -r requirements.txt
-   python agent.py
+   cd agent-csharp
+   dotnet run
    ```
 
 ## Security Notes
-- API keys are stored hashed (PBKDF2) and never logged.
+- API keys are stored hashed (PBKDF2 + pepper) and never logged.
 - All endpoints enforce payload size limits and schema validation.
 - Use HTTPS in production and restrict database permissions to least privilege.
 

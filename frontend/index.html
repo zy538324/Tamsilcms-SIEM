@@ -9,13 +9,13 @@
 <body>
     <header class="site-header">
         <div class="brand">
-            <span class="brand__accent"></span>
+            <span class="brand__accent" aria-hidden="true"></span>
             <div>
                 <h1>Tamsilcms SIEM</h1>
-                <p>Endpoint visibility in real time</p>
+                <p>Operational visibility for endpoint telemetry</p>
             </div>
         </div>
-        <div class="status-card">
+        <div class="status-card" aria-live="polite">
             <span class="status-pill">Live</span>
             <span class="status-text" id="status-text">Awaiting data</span>
         </div>
@@ -47,15 +47,27 @@
             <div class="panel__header">
                 <h2>Log Stream</h2>
                 <div class="filters">
-                    <input type="text" id="search" placeholder="Search messages">
-                    <input type="text" id="agent-filter" placeholder="Agent ID">
-                    <input type="text" id="source-filter" placeholder="Log source">
-                    <select id="level-filter">
-                        <option value="">All levels</option>
-                        <option value="INFO">INFO</option>
-                        <option value="WARN">WARN</option>
-                        <option value="ERROR">ERROR</option>
-                    </select>
+                    <label class="input-group">
+                        <span>Search</span>
+                        <input type="text" id="search" placeholder="Search messages">
+                    </label>
+                    <label class="input-group">
+                        <span>Agent ID</span>
+                        <input type="text" id="agent-filter" placeholder="UUID">
+                    </label>
+                    <label class="input-group">
+                        <span>Source</span>
+                        <input type="text" id="source-filter" placeholder="syslog">
+                    </label>
+                    <label class="input-group">
+                        <span>Level</span>
+                        <select id="level-filter">
+                            <option value="">All levels</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARN">WARN</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </label>
                     <button class="button" id="refresh-logs">Refresh</button>
                 </div>
             </div>
@@ -82,6 +94,6 @@
         </section>
     </main>
 
-    <script src="static/js/app.js"></script>
+    <script src="static/js/app.js" type="module"></script>
 </body>
 </html>
