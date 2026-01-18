@@ -9,6 +9,7 @@ import asyncpg
 
 from .models import (
     AssetRecord,
+    AssetStateResponse,
     HardwareInventory,
     InventorySnapshot,
     LocalGroup,
@@ -352,6 +353,57 @@ class InventoryStore:
                 criticality=row["criticality"],
                 last_seen_at=row["last_seen_at"],
                 updated_at=row["updated_at"],
+            )
+            for row in rows
+        ]
+
+    async def list_asset_states(
+        self, tenant_id: Optional[str] = None
+    ) -> List[AssetStateResponse]:
+        base_query = """
+            SELECT a.asset_id,
+                   a.hostname,
+                   os.os_name,
+                   os.os_version,
+                   COALESCE(sw.software_count, 0) AS software_count,
+                   COALESCE(u.user_count, 0) AS users_count,
+                   COALESCE(g.group_count, 0) AS groups_count
+            FROM assets a
+            LEFT JOIN os_inventory os ON os.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS software_count
+                FROM software_inventory
+                GROUP BY asset_id
+            ) sw ON sw.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS user_count
+                FROM local_users
+                GROUP BY asset_id
+            ) u ON u.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS group_count
+                FROM local_groups
+                GROUP BY asset_id
+            ) g ON g.asset_id = a.asset_id
+        """
+        if tenant_id:
+            rows = await self.pool.fetch(
+                base_query + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC",
+                tenant_id,
+            )
+        else:
+            rows = await self.pool.fetch(
+                base_query + " ORDER BY a.updated_at DESC",
+            )
+        return [
+            AssetStateResponse(
+                asset_id=str(row["asset_id"]),
+                hostname=row["hostname"],
+                os_name=row["os_name"],
+                os_version=row["os_version"],
+                software_count=row["software_count"],
+                users_count=row["users_count"],
+                groups_count=row["groups_count"],
             )
             for row in rows
         ]

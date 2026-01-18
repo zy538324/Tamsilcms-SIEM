@@ -152,3 +152,12 @@ async def list_assets(
     _: None = Depends(enforce_https),
 ) -> list[AssetRecord]:
     return await store.list_assets(tenant_id)
+
+
+@app.get("/inventory/assets/state", response_model=list[AssetStateResponse])
+async def list_asset_states(
+    tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[AssetStateResponse]:
+    return await store.list_asset_states(tenant_id)
