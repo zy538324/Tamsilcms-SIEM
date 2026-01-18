@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import asyncpg
-from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 
 from .config import Settings, load_settings
