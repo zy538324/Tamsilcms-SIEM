@@ -1,0 +1,373 @@
+-- Unified Security & Operations Platform
+-- PostgreSQL schema for MVP-1+ planning
+-- NOTE: This is a forward-looking schema scaffold, not yet wired to services.
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Tenancy
+CREATE TABLE tenants (
+    tenant_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Identity & Access
+CREATE TABLE identities (
+    identity_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    identity_type TEXT NOT NULL, -- user, service, agent
+    display_name TEXT NOT NULL,
+    email TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE roles (
+    role_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE permissions (
+    permission_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL UNIQUE,
+    description TEXT
+);
+
+CREATE TABLE role_permissions (
+    role_id UUID NOT NULL REFERENCES roles(role_id),
+    permission_id UUID NOT NULL REFERENCES permissions(permission_id),
+    PRIMARY KEY (role_id, permission_id)
+);
+
+CREATE TABLE identity_roles (
+    identity_id UUID NOT NULL REFERENCES identities(identity_id),
+    role_id UUID NOT NULL REFERENCES roles(role_id),
+    PRIMARY KEY (identity_id, role_id)
+);
+
+-- Assets
+CREATE TABLE assets (
+    asset_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    hostname TEXT NOT NULL,
+    asset_type TEXT NOT NULL, -- server, workstation, network, cloud
+    environment TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    criticality TEXT DEFAULT 'medium',
+    last_seen_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE asset_tags (
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    tag TEXT NOT NULL,
+    PRIMARY KEY (asset_id, tag)
+);
+
+-- Agents
+CREATE TABLE agents (
+    agent_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    identity_id UUID NOT NULL REFERENCES identities(identity_id),
+    agent_version TEXT NOT NULL,
+    trust_state TEXT NOT NULL DEFAULT 'unknown',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE agent_heartbeats (
+    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    agent_id UUID NOT NULL REFERENCES agents(agent_id),
+    hostname TEXT NOT NULL,
+    os TEXT NOT NULL,
+    uptime_seconds BIGINT NOT NULL,
+    trust_state TEXT NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Inventory
+CREATE TABLE hardware_inventory (
+    asset_id UUID PRIMARY KEY REFERENCES assets(asset_id),
+    manufacturer TEXT,
+    model TEXT,
+    serial_number TEXT,
+    cpu_model TEXT,
+    cpu_cores INTEGER,
+    memory_mb INTEGER,
+    storage_gb INTEGER,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE os_inventory (
+    asset_id UUID PRIMARY KEY REFERENCES assets(asset_id),
+    os_name TEXT NOT NULL,
+    os_version TEXT NOT NULL,
+    kernel_version TEXT,
+    architecture TEXT,
+    install_date DATE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE software_inventory (
+    software_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    name TEXT NOT NULL,
+    vendor TEXT,
+    version TEXT,
+    install_date DATE,
+    source TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE local_users (
+    user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    username TEXT NOT NULL,
+    display_name TEXT,
+    uid TEXT,
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    last_login_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE local_groups (
+    group_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    name TEXT NOT NULL,
+    gid TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE local_group_members (
+    group_id UUID NOT NULL REFERENCES local_groups(group_id),
+    user_id UUID NOT NULL REFERENCES local_users(user_id),
+    PRIMARY KEY (group_id, user_id)
+);
+
+-- Telemetry Metrics
+CREATE TABLE telemetry_metrics (
+    metric_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL UNIQUE,
+    unit TEXT,
+    description TEXT
+);
+
+CREATE TABLE telemetry_samples (
+    sample_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    metric_id UUID NOT NULL REFERENCES telemetry_metrics(metric_id),
+    value DOUBLE PRECISION NOT NULL,
+    observed_at TIMESTAMPTZ NOT NULL,
+    collected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Events (SIEM ledger)
+CREATE TABLE events (
+    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    asset_id UUID REFERENCES assets(asset_id),
+    identity_id UUID REFERENCES identities(identity_id),
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'info',
+    source TEXT NOT NULL,
+    message TEXT,
+    raw_payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE event_enrichment (
+    event_id UUID PRIMARY KEY REFERENCES events(event_id),
+    geo_ip JSONB,
+    asset_context JSONB,
+    identity_context JSONB,
+    enrichment_version TEXT,
+    enriched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Detections & Findings
+CREATE TABLE detections (
+    detection_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    rule_id UUID,
+    name TEXT NOT NULL,
+    description TEXT,
+    severity TEXT NOT NULL DEFAULT 'medium',
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE detection_events (
+    detection_id UUID NOT NULL REFERENCES detections(detection_id),
+    event_id UUID NOT NULL REFERENCES events(event_id),
+    PRIMARY KEY (detection_id, event_id)
+);
+
+-- Remote Tasks
+CREATE TABLE tasks (
+    task_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    requested_by UUID NOT NULL REFERENCES identities(identity_id),
+    command TEXT NOT NULL,
+    interpreter TEXT NOT NULL, -- bash, powershell
+    signed_payload JSONB NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE task_results (
+    task_result_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    task_id UUID NOT NULL REFERENCES tasks(task_id),
+    status TEXT NOT NULL,
+    stdout TEXT,
+    stderr TEXT,
+    exit_code INTEGER,
+    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Patch Management
+CREATE TABLE patches (
+    patch_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    vendor TEXT NOT NULL,
+    name TEXT NOT NULL,
+    kb_reference TEXT,
+    release_date DATE,
+    severity TEXT
+);
+
+CREATE TABLE asset_patches (
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    patch_id UUID NOT NULL REFERENCES patches(patch_id),
+    status TEXT NOT NULL, -- missing, installed, failed
+    last_checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (asset_id, patch_id)
+);
+
+-- Vulnerabilities
+CREATE TABLE vulnerabilities (
+    vulnerability_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cve_id TEXT NOT NULL,
+    description TEXT,
+    cvss_score NUMERIC(3,1),
+    published_at TIMESTAMPTZ,
+    last_modified_at TIMESTAMPTZ
+);
+
+CREATE TABLE asset_vulnerabilities (
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    vulnerability_id UUID NOT NULL REFERENCES vulnerabilities(vulnerability_id),
+    status TEXT NOT NULL DEFAULT 'open',
+    detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (asset_id, vulnerability_id)
+);
+
+-- Risk Scoring
+CREATE TABLE risk_scores (
+    risk_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    asset_id UUID REFERENCES assets(asset_id),
+    identity_id UUID REFERENCES identities(identity_id),
+    score NUMERIC(5,2) NOT NULL,
+    rationale TEXT,
+    calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Tickets / PSA
+CREATE TABLE tickets (
+    ticket_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    priority TEXT NOT NULL DEFAULT 'medium',
+    created_by UUID REFERENCES identities(identity_id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ticket_links (
+    ticket_id UUID NOT NULL REFERENCES tickets(ticket_id),
+    detection_id UUID REFERENCES detections(detection_id),
+    event_id UUID REFERENCES events(event_id),
+    PRIMARY KEY (ticket_id, detection_id, event_id)
+);
+
+-- Compliance
+CREATE TABLE compliance_frameworks (
+    framework_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    version TEXT,
+    description TEXT
+);
+
+CREATE TABLE compliance_controls (
+    control_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    framework_id UUID NOT NULL REFERENCES compliance_frameworks(framework_id),
+    control_code TEXT NOT NULL,
+    description TEXT,
+    severity TEXT
+);
+
+CREATE TABLE compliance_evidence (
+    evidence_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    control_id UUID NOT NULL REFERENCES compliance_controls(control_id),
+    asset_id UUID REFERENCES assets(asset_id),
+    event_id UUID REFERENCES events(event_id),
+    collected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    payload JSONB
+);
+
+-- Audit & Integrations
+CREATE TABLE audit_logs (
+    audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    actor_identity_id UUID REFERENCES identities(identity_id),
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    metadata JSONB
+);
+
+CREATE TABLE api_keys (
+    api_key_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    identity_id UUID NOT NULL REFERENCES identities(identity_id),
+    key_hash TEXT NOT NULL,
+    name TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ
+);
+
+CREATE TABLE certificates (
+    certificate_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    identity_id UUID NOT NULL REFERENCES identities(identity_id),
+    fingerprint_sha256 TEXT NOT NULL UNIQUE,
+    issued_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ
+);
+
+CREATE TABLE certificate_revocations (
+    revocation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    certificate_id UUID NOT NULL REFERENCES certificates(certificate_id),
+    reason TEXT NOT NULL,
+    revoked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_assets_tenant ON assets(tenant_id);
+CREATE INDEX idx_agents_asset ON agents(asset_id);
+CREATE INDEX idx_events_tenant_created ON events(tenant_id, created_at DESC);
+CREATE INDEX idx_events_asset ON events(asset_id);
+CREATE INDEX idx_telemetry_samples_asset ON telemetry_samples(asset_id, observed_at DESC);
+CREATE INDEX idx_tasks_asset ON tasks(asset_id);
+CREATE INDEX idx_ticket_status ON tickets(status);
