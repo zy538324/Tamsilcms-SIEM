@@ -16,6 +16,7 @@ from .config import Settings, load_settings
 from .certificates import CertificateRecord, registry
 from .agents import AgentState, store as agent_store
 from .events import HeartbeatEvent, store
+from .risk import store as risk_store
 from .models import (
     CertificateIssueRequest,
     CertificateIssueResponse,
@@ -25,6 +26,7 @@ from .models import (
     HelloResponse,
     HeartbeatEventResponse,
     AgentStateResponse,
+    RiskScoreResponse,
 )
 from .security import SignatureError, verify_signature
 
@@ -135,6 +137,11 @@ async def hello(
         os_name=payload.os,
         trust_state=payload.trust_state,
     )
+    risk_store.upsert(
+        identity_id=payload.identity_id,
+        score=0.0,
+        rationale="baseline",
+    )
 
     return HelloResponse(
         status="verified",
@@ -174,6 +181,20 @@ async def list_agents() -> list[AgentStateResponse]:
             trust_state=agent.trust_state,
         )
         for agent in agents
+    ]
+
+
+@app.get("/risk-scores", response_model=list[RiskScoreResponse])
+async def list_risk_scores() -> list[RiskScoreResponse]:
+    """Return current risk scores (in-memory)."""
+    scores = risk_store.list_all()
+    return [
+        RiskScoreResponse(
+            identity_id=score.identity_id,
+            score=score.score,
+            rationale=score.rationale,
+        )
+        for score in scores
     ]
 
 

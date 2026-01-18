@@ -50,6 +50,14 @@ class AgentStateResponse(BaseModel):
     trust_state: str
 
 
+class RiskScoreResponse(BaseModel):
+    """Risk score representation for MVP-2 visibility."""
+
+    identity_id: str
+    score: float
+    rationale: str
+
+
 class CertificateIssueRequest(BaseModel):
     """Request to register a new client certificate fingerprint."""
 
