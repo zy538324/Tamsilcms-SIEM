@@ -13,15 +13,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from .config import Settings, load_settings
-from .certificates import CertificateRecord, registry
-from .models import (
-    CertificateIssueRequest,
-    CertificateIssueResponse,
-    CertificateRevokeRequest,
-    CertificateRevokeResponse,
-    HelloRequest,
-    HelloResponse,
-)
+from .models import HelloRequest, HelloResponse
 from .security import SignatureError, verify_signature
 
 app = FastAPI(title="Identity Service", version="0.1.0")
@@ -108,43 +100,3 @@ async def hello(
         service=settings.service_name,
     )
 
-
-@app.post("/certificates/issue", response_model=CertificateIssueResponse)
-async def issue_certificate(
-    payload: CertificateIssueRequest,
-    settings: Settings = Depends(get_settings),
-    _: None = Depends(enforce_https),
-) -> CertificateIssueResponse:
-    """Register a new client certificate fingerprint for an identity."""
-    issued_at = datetime.now(timezone.utc)
-    record = CertificateRecord(
-        identity_id=payload.identity_id,
-        fingerprint_sha256=payload.fingerprint_sha256,
-        issued_at=issued_at,
-        expires_at=payload.expires_at,
-    )
-    registry.issue(record)
-    return CertificateIssueResponse(
-        status="issued",
-        issued_at=issued_at,
-        expires_at=payload.expires_at,
-    )
-
-
-@app.post("/certificates/revoke", response_model=CertificateRevokeResponse)
-async def revoke_certificate(
-    payload: CertificateRevokeRequest,
-    settings: Settings = Depends(get_settings),
-    _: None = Depends(enforce_https),
-) -> CertificateRevokeResponse:
-    """Revoke a client certificate fingerprint."""
-    record = registry.revoke(payload.fingerprint_sha256, payload.reason)
-    if not record or not record.revoked_at:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="certificate_not_found",
-        )
-    return CertificateRevokeResponse(
-        status="revoked",
-        revoked_at=record.revoked_at,
-    )
