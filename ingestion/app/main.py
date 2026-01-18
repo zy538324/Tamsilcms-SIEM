@@ -13,8 +13,10 @@ from .models import (
     OsInventory,
     SoftwareInventory,
     InventorySnapshot,
+    AssetStateResponse,
 )
 from .storage import store
+from .state import derive_state
 
 app = FastAPI(title="Ingestion Service", version="0.1.0")
 
@@ -94,3 +96,12 @@ async def get_inventory(
     snapshot = store.snapshot(asset_id)
     return snapshot
 
+
+@app.get("/inventory/{asset_id}/state", response_model=AssetStateResponse)
+async def get_inventory_state(
+    asset_id: str,
+    _: None = Depends(enforce_https),
+) -> AssetStateResponse:
+    snapshot = store.snapshot(asset_id)
+    state = derive_state(asset_id, snapshot)
+    return AssetStateResponse(**state.__dict__)

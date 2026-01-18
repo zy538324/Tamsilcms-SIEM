@@ -92,20 +92,47 @@ bool SendInventorySnapshot(const Config& config) {
 
     std::ostringstream os;
     os << '{'
-       << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\"," 
-       << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\"," 
-       << "\"collected_at\":\"" << collected_at << "\"," 
-       << "\"os_name\":\"" << JsonEscape(config.os_name) << "\"," 
-       << "\"os_version\":\"unknown\"," 
+       << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
+       << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\","
+       << "\"collected_at\":\"" << collected_at << "\","
+       << "\"os_name\":\"" << JsonEscape(config.os_name) << "\","
+       << "\"os_version\":\"unknown\","
        << "\"kernel_version\":null,"
        << "\"architecture\":null,"
        << "\"install_date\":null"
        << '}';
 
+    std::ostringstream software;
+    software << '{'
+             << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
+             << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\","
+             << "\"collected_at\":\"" << collected_at << "\","
+             << "\"items\":[]"
+             << '}';
+
+    std::ostringstream users;
+    users << '{'
+          << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
+          << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\","
+          << "\"collected_at\":\"" << collected_at << "\","
+          << "\"users\":[]"
+          << '}';
+
+    std::ostringstream groups;
+    groups << '{'
+           << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
+           << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\","
+           << "\"collected_at\":\"" << collected_at << "\","
+           << "\"groups\":[]"
+           << '}';
+
     bool hardware_ok = PostJson(config.transport_url + "/mtls/inventory/hardware", hardware.str());
     bool os_ok = PostJson(config.transport_url + "/mtls/inventory/os", os.str());
+    bool software_ok = PostJson(config.transport_url + "/mtls/inventory/software", software.str());
+    bool users_ok = PostJson(config.transport_url + "/mtls/inventory/users", users.str());
+    bool groups_ok = PostJson(config.transport_url + "/mtls/inventory/groups", groups.str());
 
-    return hardware_ok && os_ok;
+    return hardware_ok && os_ok && software_ok && users_ok && groups_ok;
 }
 
 }  // namespace agent

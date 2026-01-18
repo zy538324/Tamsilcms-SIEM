@@ -72,3 +72,12 @@ class InventorySnapshot(BaseModel):
     users: Optional[LocalUsersInventory] = None
     groups: Optional[LocalGroupsInventory] = None
 
+
+class AssetStateResponse(BaseModel):
+    asset_id: str
+    hostname: Optional[str] = None
+    os_name: Optional[str] = None
+    os_version: Optional[str] = None
+    software_count: int
+    users_count: int
+    groups_count: int
