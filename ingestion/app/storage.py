@@ -8,6 +8,7 @@ from typing import List, Optional
 import asyncpg
 
 from .models import (
+    AssetInventoryOverview,
     AssetRecord,
     AssetStateResponse,
     HardwareInventory,
@@ -169,6 +170,42 @@ class InventoryStore:
             payload.hostname,
             payload.collected_at,
         )
+        await self.pool.execute(
+            """
+            INSERT INTO hardware_inventory (
+                asset_id,
+                manufacturer,
+                model,
+                serial_number,
+                cpu_model,
+                cpu_cores,
+                memory_mb,
+                storage_gb,
+                updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (asset_id) DO UPDATE
+            SET manufacturer = EXCLUDED.manufacturer,
+                model = EXCLUDED.model,
+                serial_number = EXCLUDED.serial_number,
+                cpu_model = EXCLUDED.cpu_model,
+                cpu_cores = EXCLUDED.cpu_cores,
+                memory_mb = EXCLUDED.memory_mb,
+                storage_gb = EXCLUDED.storage_gb,
+                updated_at = EXCLUDED.updated_at
+            """,
+            payload.asset_id,
+            payload.manufacturer,
+            payload.model,
+            payload.serial_number,
+            payload.cpu_model,
+            payload.cpu_cores,
+            payload.memory_mb,
+            payload.storage_gb,
+            payload.collected_at,
+        )
+
+    async def upsert_os(self, payload: OsInventory) -> None:
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 await connection.execute(
@@ -205,6 +242,107 @@ class InventoryStore:
             payload.hostname,
             payload.collected_at,
         )
+        await self.pool.execute(
+            """
+            INSERT INTO os_inventory (
+                asset_id,
+                os_name,
+                os_version,
+                kernel_version,
+                architecture,
+                install_date,
+                updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (asset_id) DO UPDATE
+            SET os_name = EXCLUDED.os_name,
+                os_version = EXCLUDED.os_version,
+                kernel_version = EXCLUDED.kernel_version,
+                architecture = EXCLUDED.architecture,
+                install_date = EXCLUDED.install_date,
+                updated_at = EXCLUDED.updated_at
+            """,
+            payload.asset_id,
+            payload.os_name,
+            payload.os_version,
+            payload.kernel_version,
+            payload.architecture,
+            _parse_date(payload.install_date),
+            payload.collected_at,
+        )
+
+    async def upsert_software(self, payload: SoftwareInventory) -> None:
+        await self._ensure_asset(
+            payload.tenant_id,
+            payload.asset_id,
+            payload.hostname,
+            payload.collected_at,
+        )
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    "DELETE FROM software_inventory WHERE asset_id = $1",
+                    payload.asset_id,
+                )
+                for item in payload.items:
+                    await connection.execute(
+                        """
+                        INSERT INTO software_inventory (
+                            asset_id,
+                            name,
+                            vendor,
+                            version,
+                            install_date,
+                            source,
+                            updated_at
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        """,
+                        payload.asset_id,
+                        item.name,
+                        item.vendor,
+                        item.version,
+                        _parse_date(item.install_date),
+                        item.source,
+                        payload.collected_at,
+                    )
+
+    async def upsert_users(self, payload: LocalUsersInventory) -> None:
+        await self._ensure_asset(
+            payload.tenant_id,
+            payload.asset_id,
+            payload.hostname,
+            payload.collected_at,
+        )
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    "DELETE FROM local_users WHERE asset_id = $1",
+                    payload.asset_id,
+                )
+                for user in payload.users:
+                    await connection.execute(
+                        """
+                        INSERT INTO local_users (
+                            asset_id,
+                            username,
+                            display_name,
+                            uid,
+                            is_admin,
+                            last_login_at,
+                            updated_at
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        """,
+                        payload.asset_id,
+                        user.username,
+                        user.display_name,
+                        user.uid,
+                        user.is_admin,
+                        user.last_login_at,
+                        payload.collected_at,
+                    )
+
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 await connection.execute(
@@ -308,6 +446,12 @@ class InventoryStore:
         )
 
     async def list_assets(self, tenant_id: Optional[str] = None) -> List[AssetRecord]:
+    async def list_assets(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[AssetRecord]:
         if tenant_id:
             rows = await self.pool.fetch(
                 """
@@ -325,6 +469,11 @@ class InventoryStore:
                 ORDER BY updated_at DESC
                 """,
                 tenant_id,
+                LIMIT $2 OFFSET $3
+                """,
+                tenant_id,
+                limit,
+                offset,
             )
         else:
             rows = await self.pool.fetch(
@@ -341,6 +490,10 @@ class InventoryStore:
                 FROM assets
                 ORDER BY updated_at DESC
                 """,
+                LIMIT $1 OFFSET $2
+                """,
+                limit,
+                offset,
             )
         return [
             AssetRecord(
@@ -365,11 +518,153 @@ class InventoryStore:
                    a.hostname,
                    os.os_name,
                    os.os_version,
+
+    async def list_asset_states(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[AssetStateResponse]:
+        base_query = """
+            SELECT a.asset_id,
+                   a.hostname,
+                   os.os_name,
+                   os.os_version,
                    COALESCE(sw.software_count, 0) AS software_count,
                    COALESCE(u.user_count, 0) AS users_count,
                    COALESCE(g.group_count, 0) AS groups_count
             FROM assets a
             LEFT JOIN os_inventory os ON os.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS software_count
+                FROM software_inventory
+                GROUP BY asset_id
+            ) sw ON sw.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS user_count
+                FROM local_users
+                GROUP BY asset_id
+            ) u ON u.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS group_count
+                FROM local_groups
+                GROUP BY asset_id
+            ) g ON g.asset_id = a.asset_id
+        """
+        if tenant_id:
+            rows = await self.pool.fetch(
+                base_query
+                + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
+                tenant_id,
+                limit,
+                offset,
+            )
+        else:
+            rows = await self.pool.fetch(
+                base_query + " ORDER BY a.updated_at DESC LIMIT $1 OFFSET $2",
+                limit,
+                offset,
+            )
+        return [
+            AssetStateResponse(
+                asset_id=str(row["asset_id"]),
+                hostname=row["hostname"],
+                os_name=row["os_name"],
+                os_version=row["os_version"],
+                software_count=row["software_count"],
+                users_count=row["users_count"],
+                groups_count=row["groups_count"],
+            )
+            for row in rows
+        ]
+
+    async def list_asset_overviews(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[AssetInventoryOverview]:
+        base_query = """
+            SELECT a.asset_id,
+                   a.tenant_id,
+                   a.hostname,
+                   a.last_seen_at,
+                   a.updated_at,
+                   os.os_name,
+                   os.os_version,
+                   hw.model AS hardware_model,
+                   COALESCE(sw.software_count, 0) AS software_count,
+                   COALESCE(u.user_count, 0) AS users_count,
+                   COALESCE(g.group_count, 0) AS groups_count
+            FROM assets a
+            LEFT JOIN os_inventory os ON os.asset_id = a.asset_id
+            LEFT JOIN hardware_inventory hw ON hw.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS software_count
+                FROM software_inventory
+                GROUP BY asset_id
+            ) sw ON sw.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS user_count
+                FROM local_users
+                GROUP BY asset_id
+            ) u ON u.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS group_count
+                FROM local_groups
+                GROUP BY asset_id
+            ) g ON g.asset_id = a.asset_id
+        """
+        if tenant_id:
+            rows = await self.pool.fetch(
+                base_query
+                + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
+                tenant_id,
+                limit,
+                offset,
+            )
+        else:
+            rows = await self.pool.fetch(
+                base_query + " ORDER BY a.updated_at DESC LIMIT $1 OFFSET $2",
+                limit,
+                offset,
+            )
+        return [
+            AssetInventoryOverview(
+                asset_id=str(row["asset_id"]),
+                tenant_id=str(row["tenant_id"]),
+                hostname=row["hostname"],
+                os_name=row["os_name"],
+                os_version=row["os_version"],
+                hardware_model=row["hardware_model"],
+                software_count=row["software_count"],
+                users_count=row["users_count"],
+                groups_count=row["groups_count"],
+                last_seen_at=row["last_seen_at"],
+                updated_at=row["updated_at"],
+            )
+            for row in rows
+        ]
+
+    async def get_asset_overview(
+        self, asset_id: str
+    ) -> Optional[AssetInventoryOverview]:
+        row = await self.pool.fetchrow(
+            """
+            SELECT a.asset_id,
+                   a.tenant_id,
+                   a.hostname,
+                   a.last_seen_at,
+                   a.updated_at,
+                   os.os_name,
+                   os.os_version,
+                   hw.model AS hardware_model,
+                   COALESCE(sw.software_count, 0) AS software_count,
+                   COALESCE(u.user_count, 0) AS users_count,
+                   COALESCE(g.group_count, 0) AS groups_count
+            FROM assets a
+            LEFT JOIN os_inventory os ON os.asset_id = a.asset_id
+            LEFT JOIN hardware_inventory hw ON hw.asset_id = a.asset_id
             LEFT JOIN (
                 SELECT asset_id, COUNT(*) AS software_count
                 FROM software_inventory
@@ -407,6 +702,25 @@ class InventoryStore:
             )
             for row in rows
         ]
+            WHERE a.asset_id = $1
+            """,
+            asset_id,
+        )
+        if not row:
+            return None
+        return AssetInventoryOverview(
+            asset_id=str(row["asset_id"]),
+            tenant_id=str(row["tenant_id"]),
+            hostname=row["hostname"],
+            os_name=row["os_name"],
+            os_version=row["os_version"],
+            hardware_model=row["hardware_model"],
+            software_count=row["software_count"],
+            users_count=row["users_count"],
+            groups_count=row["groups_count"],
+            last_seen_at=row["last_seen_at"],
+            updated_at=row["updated_at"],
+        )
 
     async def _fetch_asset_context(self, asset_id: str) -> Optional[asyncpg.Record]:
         return await self.pool.fetchrow(

@@ -94,3 +94,17 @@ class AssetRecord(BaseModel):
     criticality: Optional[str] = None
     last_seen_at: Optional[datetime] = None
     updated_at: datetime
+
+
+class AssetInventoryOverview(BaseModel):
+    asset_id: str
+    tenant_id: str
+    hostname: str
+    os_name: Optional[str] = None
+    os_version: Optional[str] = None
+    hardware_model: Optional[str] = None
+    software_count: int
+    users_count: int
+    groups_count: int
+    last_seen_at: Optional[datetime] = None
+    updated_at: datetime
