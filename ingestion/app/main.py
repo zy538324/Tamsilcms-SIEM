@@ -127,7 +127,7 @@ async def ingest_groups(
 
 @app.get("/inventory/{asset_id}", response_model=InventorySnapshot)
 async def get_inventory(
-    asset_id: str,
+    asset_id: str = Path(..., min_length=8, max_length=64),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> InventorySnapshot:
@@ -137,7 +137,7 @@ async def get_inventory(
 
 @app.get("/inventory/{asset_id}/state", response_model=AssetStateResponse)
 async def get_inventory_state(
-    asset_id: str,
+    asset_id: str = Path(..., min_length=8, max_length=64),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> AssetStateResponse:
@@ -149,28 +149,36 @@ async def get_inventory_state(
 @app.get("/inventory/assets", response_model=list[AssetRecord])
 async def list_assets(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=100000),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> list[AssetRecord]:
-    return await store.list_assets(tenant_id)
+    return await store.list_assets(tenant_id=tenant_id, limit=limit, offset=offset)
 
 
 @app.get("/inventory/assets/state", response_model=list[AssetStateResponse])
 async def list_asset_states(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=100000),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> list[AssetStateResponse]:
-    return await store.list_asset_states(tenant_id)
+    return await store.list_asset_states(tenant_id=tenant_id, limit=limit, offset=offset)
 
 
 @app.get("/inventory/assets/overview", response_model=list[AssetInventoryOverview])
 async def list_asset_overviews(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=100000),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> list[AssetInventoryOverview]:
-    return await store.list_asset_overviews(tenant_id)
+    return await store.list_asset_overviews(
+        tenant_id=tenant_id, limit=limit, offset=offset
+    )
 
 
 @app.get(
@@ -178,7 +186,7 @@ async def list_asset_overviews(
     response_model=AssetInventoryOverview,
 )
 async def get_asset_overview(
-    asset_id: str,
+    asset_id: str = Path(..., min_length=8, max_length=64),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> AssetInventoryOverview:
