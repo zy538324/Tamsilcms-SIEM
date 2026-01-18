@@ -73,7 +73,7 @@ struct HardwareInfo {
 
 struct OsInfo {
     std::string os_name;
-    std::optional<std::string> os_version;
+    std::string os_version;
     std::optional<std::string> kernel_version;
     std::optional<std::string> architecture;
 };
@@ -456,7 +456,7 @@ bool SendInventorySnapshot(const Config& config) {
        << "\"hostname\":\"" << JsonEscape(config.hostname) << "\","
        ;
     AppendString(os, "os_name", os_info.os_name);
-    AppendOptionalString(os, "os_version", os_info.os_version);
+    AppendString(os, "os_version", os_info.os_version);
     AppendOptionalString(os, "kernel_version", os_info.kernel_version);
     AppendOptionalString(os, "architecture", os_info.architecture);
     os << "\"install_date\":null";

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import asyncpg
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, status
 from fastapi.responses import JSONResponse
 
 from .config import Settings, load_settings
@@ -14,6 +14,7 @@ from .models import (
     OsInventory,
     SoftwareInventory,
     AssetInventoryOverview,
+    AssetInventoryPage,
     AssetRecord,
     InventorySnapshot,
     AssetStateResponse,
@@ -178,6 +179,27 @@ async def list_asset_overviews(
 ) -> list[AssetInventoryOverview]:
     return await store.list_asset_overviews(
         tenant_id=tenant_id, limit=limit, offset=offset
+    )
+
+
+@app.get("/inventory/assets/overview/page", response_model=AssetInventoryPage)
+async def list_asset_overview_page(
+    tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=100000),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> AssetInventoryPage:
+    items, total = await store.list_asset_overview_page(
+        tenant_id=tenant_id,
+        limit=limit,
+        offset=offset,
+    )
+    return AssetInventoryPage(
+        items=items,
+        limit=limit,
+        offset=offset,
+        total=total,
     )
 
 

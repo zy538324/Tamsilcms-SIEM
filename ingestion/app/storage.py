@@ -170,42 +170,6 @@ class InventoryStore:
             payload.hostname,
             payload.collected_at,
         )
-        await self.pool.execute(
-            """
-            INSERT INTO hardware_inventory (
-                asset_id,
-                manufacturer,
-                model,
-                serial_number,
-                cpu_model,
-                cpu_cores,
-                memory_mb,
-                storage_gb,
-                updated_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (asset_id) DO UPDATE
-            SET manufacturer = EXCLUDED.manufacturer,
-                model = EXCLUDED.model,
-                serial_number = EXCLUDED.serial_number,
-                cpu_model = EXCLUDED.cpu_model,
-                cpu_cores = EXCLUDED.cpu_cores,
-                memory_mb = EXCLUDED.memory_mb,
-                storage_gb = EXCLUDED.storage_gb,
-                updated_at = EXCLUDED.updated_at
-            """,
-            payload.asset_id,
-            payload.manufacturer,
-            payload.model,
-            payload.serial_number,
-            payload.cpu_model,
-            payload.cpu_cores,
-            payload.memory_mb,
-            payload.storage_gb,
-            payload.collected_at,
-        )
-
-    async def upsert_os(self, payload: OsInventory) -> None:
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 await connection.execute(
@@ -242,250 +206,6 @@ class InventoryStore:
             payload.hostname,
             payload.collected_at,
         )
-        await self.pool.execute(
-            """
-            INSERT INTO os_inventory (
-                asset_id,
-                os_name,
-                os_version,
-                kernel_version,
-                architecture,
-                install_date,
-                updated_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (asset_id) DO UPDATE
-            SET os_name = EXCLUDED.os_name,
-                os_version = EXCLUDED.os_version,
-                kernel_version = EXCLUDED.kernel_version,
-                architecture = EXCLUDED.architecture,
-                install_date = EXCLUDED.install_date,
-                updated_at = EXCLUDED.updated_at
-            """,
-            payload.asset_id,
-            payload.os_name,
-            payload.os_version,
-            payload.kernel_version,
-            payload.architecture,
-            _parse_date(payload.install_date),
-            payload.collected_at,
-        )
-
-    async def upsert_software(self, payload: SoftwareInventory) -> None:
-        await self._ensure_asset(
-            payload.tenant_id,
-            payload.asset_id,
-            payload.hostname,
-            payload.collected_at,
-        )
-        async with self.pool.acquire() as connection:
-            async with connection.transaction():
-                await connection.execute(
-                    "DELETE FROM software_inventory WHERE asset_id = $1",
-                    payload.asset_id,
-                )
-                for item in payload.items:
-                    await connection.execute(
-                        """
-                        INSERT INTO software_inventory (
-                            asset_id,
-                            name,
-                            vendor,
-                            version,
-                            install_date,
-                            source,
-                            updated_at
-                        )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                        """,
-                        payload.asset_id,
-                        item.name,
-                        item.vendor,
-                        item.version,
-                        _parse_date(item.install_date),
-                        item.source,
-                        payload.collected_at,
-                    )
-
-    async def upsert_users(self, payload: LocalUsersInventory) -> None:
-        await self._ensure_asset(
-            payload.tenant_id,
-            payload.asset_id,
-            payload.hostname,
-            payload.collected_at,
-        )
-        await self.pool.execute(
-            """
-            INSERT INTO hardware_inventory (
-                asset_id,
-                manufacturer,
-                model,
-                serial_number,
-                cpu_model,
-                cpu_cores,
-                memory_mb,
-                storage_gb,
-                updated_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (asset_id) DO UPDATE
-            SET manufacturer = EXCLUDED.manufacturer,
-                model = EXCLUDED.model,
-                serial_number = EXCLUDED.serial_number,
-                cpu_model = EXCLUDED.cpu_model,
-                cpu_cores = EXCLUDED.cpu_cores,
-                memory_mb = EXCLUDED.memory_mb,
-                storage_gb = EXCLUDED.storage_gb,
-                updated_at = EXCLUDED.updated_at
-            """,
-            payload.asset_id,
-            payload.manufacturer,
-            payload.model,
-            payload.serial_number,
-            payload.cpu_model,
-            payload.cpu_cores,
-            payload.memory_mb,
-            payload.storage_gb,
-            payload.collected_at,
-        )
-
-    async def upsert_os(self, payload: OsInventory) -> None:
-        await self._ensure_asset(
-            payload.tenant_id,
-            payload.asset_id,
-            payload.hostname,
-            payload.collected_at,
-        )
-        await self.pool.execute(
-            """
-            INSERT INTO os_inventory (
-                asset_id,
-                os_name,
-                os_version,
-                kernel_version,
-                architecture,
-                install_date,
-                updated_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (asset_id) DO UPDATE
-            SET os_name = EXCLUDED.os_name,
-                os_version = EXCLUDED.os_version,
-                kernel_version = EXCLUDED.kernel_version,
-                architecture = EXCLUDED.architecture,
-                install_date = EXCLUDED.install_date,
-                updated_at = EXCLUDED.updated_at
-            """,
-            payload.asset_id,
-            payload.os_name,
-            payload.os_version,
-            payload.kernel_version,
-            payload.architecture,
-            _parse_date(payload.install_date),
-            payload.collected_at,
-        )
-
-    async def upsert_software(self, payload: SoftwareInventory) -> None:
-        await self._ensure_asset(
-            payload.tenant_id,
-            payload.asset_id,
-            payload.hostname,
-            payload.collected_at,
-        )
-        async with self.pool.acquire() as connection:
-            async with connection.transaction():
-                await connection.execute(
-                    "DELETE FROM software_inventory WHERE asset_id = $1",
-                    payload.asset_id,
-                )
-                for item in payload.items:
-                    await connection.execute(
-                        """
-                        INSERT INTO software_inventory (
-                            asset_id,
-                            name,
-                            vendor,
-                            version,
-                            install_date,
-                            source,
-                            updated_at
-                        )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                        """,
-                        payload.asset_id,
-                        item.name,
-                        item.vendor,
-                        item.version,
-                        _parse_date(item.install_date),
-                        item.source,
-                        payload.collected_at,
-                    )
-
-    async def upsert_users(self, payload: LocalUsersInventory) -> None:
-        await self._ensure_asset(
-            payload.tenant_id,
-            payload.asset_id,
-            payload.hostname,
-            payload.collected_at,
-        )
-        async with self.pool.acquire() as connection:
-            async with connection.transaction():
-                await connection.execute(
-                    "DELETE FROM local_users WHERE asset_id = $1",
-                    payload.asset_id,
-                )
-                for user in payload.users:
-                    await connection.execute(
-                        """
-                        INSERT INTO local_users (
-                            asset_id,
-                            username,
-                            display_name,
-                            uid,
-                            is_admin,
-                            last_login_at,
-                            updated_at
-                        )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                        """,
-                        payload.asset_id,
-                        user.username,
-                        user.display_name,
-                        user.uid,
-                        user.is_admin,
-                        user.last_login_at,
-                        payload.collected_at,
-                    )
-
-        async with self.pool.acquire() as connection:
-            async with connection.transaction():
-                await connection.execute(
-                    "DELETE FROM local_users WHERE asset_id = $1",
-                    payload.asset_id,
-                )
-                for user in payload.users:
-                    await connection.execute(
-                        """
-                        INSERT INTO local_users (
-                            asset_id,
-                            username,
-                            display_name,
-                            uid,
-                            is_admin,
-                            last_login_at,
-                            updated_at
-                        )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                        """,
-                        payload.asset_id,
-                        user.username,
-                        user.display_name,
-                        user.uid,
-                        user.is_admin,
-                        user.last_login_at,
-                        payload.collected_at,
-                    )
-
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 await connection.execute(
@@ -588,333 +308,6 @@ class InventoryStore:
             groups=groups,
         )
 
-    async def list_assets(self, tenant_id: Optional[str] = None) -> List[AssetRecord]:
-        if tenant_id:
-            rows = await self.pool.fetch(
-                """
-                SELECT asset_id,
-                       tenant_id,
-                       hostname,
-                       asset_type,
-                       environment,
-                       status,
-                       criticality,
-                       last_seen_at,
-                       updated_at
-                FROM assets
-                WHERE tenant_id = $1
-                ORDER BY updated_at DESC
-                """,
-                tenant_id,
-            )
-        else:
-            rows = await self.pool.fetch(
-                """
-                SELECT asset_id,
-                       tenant_id,
-                       hostname,
-                       asset_type,
-                       environment,
-                       status,
-                       criticality,
-                       last_seen_at,
-                       updated_at
-                FROM assets
-                ORDER BY updated_at DESC
-                """,
-            )
-        return [
-            AssetRecord(
-                asset_id=str(row["asset_id"]),
-                tenant_id=str(row["tenant_id"]),
-                hostname=row["hostname"],
-                asset_type=row["asset_type"],
-                environment=row["environment"],
-                status=row["status"],
-                criticality=row["criticality"],
-                last_seen_at=row["last_seen_at"],
-                updated_at=row["updated_at"],
-            )
-            for row in rows
-        ]
-
-    async def list_asset_states(
-        self, tenant_id: Optional[str] = None
-    ) -> List[AssetStateResponse]:
-        base_query = """
-            SELECT a.asset_id,
-                   a.hostname,
-                   os.os_name,
-                   os.os_version,
-                   COALESCE(sw.software_count, 0) AS software_count,
-                   COALESCE(u.user_count, 0) AS users_count,
-                   COALESCE(g.group_count, 0) AS groups_count
-            FROM assets a
-            LEFT JOIN os_inventory os ON os.asset_id = a.asset_id
-            LEFT JOIN (
-                SELECT asset_id, COUNT(*) AS software_count
-                FROM software_inventory
-                GROUP BY asset_id
-            ) sw ON sw.asset_id = a.asset_id
-            LEFT JOIN (
-                SELECT asset_id, COUNT(*) AS user_count
-                FROM local_users
-                GROUP BY asset_id
-            ) u ON u.asset_id = a.asset_id
-            LEFT JOIN (
-                SELECT asset_id, COUNT(*) AS group_count
-                FROM local_groups
-                GROUP BY asset_id
-            ) g ON g.asset_id = a.asset_id
-        """
-        if tenant_id:
-            rows = await self.pool.fetch(
-                base_query + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC",
-                tenant_id,
-            )
-        else:
-            rows = await self.pool.fetch(
-                base_query + " ORDER BY a.updated_at DESC",
-            )
-        return [
-            AssetStateResponse(
-                asset_id=str(row["asset_id"]),
-                hostname=row["hostname"],
-                os_name=row["os_name"],
-                os_version=row["os_version"],
-                software_count=row["software_count"],
-                users_count=row["users_count"],
-                groups_count=row["groups_count"],
-            )
-            for row in rows
-        ]
-
-    async def list_asset_overviews(
-        self, tenant_id: Optional[str] = None
-    ) -> List[AssetInventoryOverview]:
-        base_query = """
-            SELECT a.asset_id,
-                   a.tenant_id,
-                   a.hostname,
-                   a.last_seen_at,
-                   a.updated_at,
-                   os.os_name,
-                   os.os_version,
-                   hw.model AS hardware_model,
-                   COALESCE(sw.software_count, 0) AS software_count,
-                   COALESCE(u.user_count, 0) AS users_count,
-                   COALESCE(g.group_count, 0) AS groups_count
-            FROM assets a
-            LEFT JOIN os_inventory os ON os.asset_id = a.asset_id
-            LEFT JOIN hardware_inventory hw ON hw.asset_id = a.asset_id
-            LEFT JOIN (
-                SELECT asset_id, COUNT(*) AS software_count
-                FROM software_inventory
-                GROUP BY asset_id
-            ) sw ON sw.asset_id = a.asset_id
-            LEFT JOIN (
-                SELECT asset_id, COUNT(*) AS user_count
-                FROM local_users
-                GROUP BY asset_id
-            ) u ON u.asset_id = a.asset_id
-            LEFT JOIN (
-                SELECT asset_id, COUNT(*) AS group_count
-                FROM local_groups
-                GROUP BY asset_id
-            ) g ON g.asset_id = a.asset_id
-        """
-        if tenant_id:
-            rows = await self.pool.fetch(
-                base_query + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC",
-                tenant_id,
-            )
-        else:
-            rows = await self.pool.fetch(
-                base_query + " ORDER BY a.updated_at DESC",
-            )
-        return [
-            AssetInventoryOverview(
-                asset_id=str(row["asset_id"]),
-                tenant_id=str(row["tenant_id"]),
-                hostname=row["hostname"],
-                os_name=row["os_name"],
-                os_version=row["os_version"],
-                hardware_model=row["hardware_model"],
-                software_count=row["software_count"],
-                users_count=row["users_count"],
-                groups_count=row["groups_count"],
-                last_seen_at=row["last_seen_at"],
-                updated_at=row["updated_at"],
-            )
-            for row in rows
-        ]
-
-    async def _fetch_asset_context(self, asset_id: str) -> Optional[asyncpg.Record]:
-        return await self.pool.fetchrow(
-            """
-            SELECT tenant_id,
-                   hostname
-            FROM assets
-            WHERE asset_id = $1
-            """,
-            asset_id,
-        )
-
-    async def _fetch_hardware(
-        self,
-        asset_id: str,
-        tenant_id: str,
-        hostname: Optional[str],
-    ) -> Optional[HardwareInventory]:
-        row = await self.pool.fetchrow(
-            """
-            SELECT manufacturer,
-                   model,
-                   serial_number,
-                   cpu_model,
-                   cpu_cores,
-                   memory_mb,
-                   storage_gb,
-                   updated_at
-            FROM hardware_inventory
-            WHERE asset_id = $1
-            """,
-            asset_id,
-        )
-        if not row:
-            return None
-        return HardwareInventory(
-            tenant_id=tenant_id,
-            asset_id=asset_id,
-            collected_at=row["updated_at"],
-            hostname=hostname,
-            manufacturer=row["manufacturer"],
-            model=row["model"],
-            serial_number=row["serial_number"],
-            cpu_model=row["cpu_model"],
-            cpu_cores=row["cpu_cores"],
-            memory_mb=row["memory_mb"],
-            storage_gb=row["storage_gb"],
-        )
-
-    async def _fetch_os(
-        self,
-        asset_id: str,
-        tenant_id: str,
-        hostname: Optional[str],
-    ) -> Optional[OsInventory]:
-        row = await self.pool.fetchrow(
-            """
-            SELECT os_name,
-                   os_version,
-                   kernel_version,
-                   architecture,
-                   install_date,
-                   updated_at
-            FROM os_inventory
-            WHERE asset_id = $1
-            """,
-            asset_id,
-        )
-        if not row:
-            return None
-        return OsInventory(
-            tenant_id=tenant_id,
-            asset_id=asset_id,
-            collected_at=row["updated_at"],
-            hostname=hostname,
-            os_name=row["os_name"],
-            os_version=row["os_version"],
-            kernel_version=row["kernel_version"],
-            architecture=row["architecture"],
-            install_date=_to_iso_date(row["install_date"]),
-        )
-
-    async def _fetch_software(
-        self,
-        asset_id: str,
-        tenant_id: str,
-        hostname: Optional[str],
-    ) -> Optional[SoftwareInventory]:
-        rows = await self.pool.fetch(
-            """
-            SELECT name,
-                   vendor,
-                   version,
-                   install_date,
-                   source,
-                   updated_at
-            FROM software_inventory
-            WHERE asset_id = $1
-            ORDER BY name
-            """,
-            asset_id,
-        )
-        if not rows:
-            return None
-        collected_at = max(row["updated_at"] for row in rows)
-        items = [
-            SoftwareItem(
-                name=row["name"],
-                vendor=row["vendor"],
-                version=row["version"],
-                install_date=_to_iso_date(row["install_date"]),
-                source=row["source"],
-            )
-            for row in rows
-        ]
-        return SoftwareInventory(
-            tenant_id=tenant_id,
-            asset_id=asset_id,
-            collected_at=collected_at,
-            hostname=hostname,
-            items=items,
-        )
-
-    async def _fetch_users(
-        self,
-        asset_id: str,
-        tenant_id: str,
-        hostname: Optional[str],
-    ) -> Optional[LocalUsersInventory]:
-        rows = await self.pool.fetch(
-            """
-            SELECT username,
-                   display_name,
-                   uid,
-                   is_admin,
-                   last_login_at,
-                   updated_at
-            FROM local_users
-            WHERE asset_id = $1
-            ORDER BY username
-            """,
-            asset_id,
-        )
-        if not rows:
-            return None
-        collected_at = max(row["updated_at"] for row in rows)
-        users = [
-            LocalUser(
-                username=row["username"],
-                display_name=row["display_name"],
-                uid=row["uid"],
-                is_admin=row["is_admin"],
-                last_login_at=row["last_login_at"],
-            )
-            for row in rows
-        ]
-        return LocalUsersInventory(
-            tenant_id=tenant_id,
-            asset_id=asset_id,
-            collected_at=collected_at,
-            hostname=hostname,
-            users=users,
-        )
-
-        )
-
-    async def list_assets(self, tenant_id: Optional[str] = None) -> List[AssetRecord]:
     async def list_assets(
         self,
         tenant_id: Optional[str] = None,
@@ -936,8 +329,6 @@ class InventoryStore:
                 FROM assets
                 WHERE tenant_id = $1
                 ORDER BY updated_at DESC
-                """,
-                tenant_id,
                 LIMIT $2 OFFSET $3
                 """,
                 tenant_id,
@@ -958,7 +349,6 @@ class InventoryStore:
                        updated_at
                 FROM assets
                 ORDER BY updated_at DESC
-                """,
                 LIMIT $1 OFFSET $2
                 """,
                 limit,
@@ -978,15 +368,6 @@ class InventoryStore:
             )
             for row in rows
         ]
-
-    async def list_asset_states(
-        self, tenant_id: Optional[str] = None
-    ) -> List[AssetStateResponse]:
-        base_query = """
-            SELECT a.asset_id,
-                   a.hostname,
-                   os.os_name,
-                   os.os_version,
 
     async def list_asset_states(
         self,
@@ -1114,6 +495,26 @@ class InventoryStore:
             )
             for row in rows
         ]
+
+    async def list_asset_overview_page(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[List[AssetInventoryOverview], int]:
+        if tenant_id:
+            total = await self.pool.fetchval(
+                "SELECT COUNT(*) FROM assets WHERE tenant_id = $1",
+                tenant_id,
+            )
+        else:
+            total = await self.pool.fetchval("SELECT COUNT(*) FROM assets")
+        items = await self.list_asset_overviews(
+            tenant_id=tenant_id,
+            limit=limit,
+            offset=offset,
+        )
+        return items, int(total or 0)
 
     async def get_asset_overview(
         self, asset_id: str
@@ -1149,28 +550,6 @@ class InventoryStore:
                 FROM local_groups
                 GROUP BY asset_id
             ) g ON g.asset_id = a.asset_id
-        """
-        if tenant_id:
-            rows = await self.pool.fetch(
-                base_query + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC",
-                tenant_id,
-            )
-        else:
-            rows = await self.pool.fetch(
-                base_query + " ORDER BY a.updated_at DESC",
-            )
-        return [
-            AssetStateResponse(
-                asset_id=str(row["asset_id"]),
-                hostname=row["hostname"],
-                os_name=row["os_name"],
-                os_version=row["os_version"],
-                software_count=row["software_count"],
-                users_count=row["users_count"],
-                groups_count=row["groups_count"],
-            )
-            for row in rows
-        ]
             WHERE a.asset_id = $1
             """,
             asset_id,

@@ -108,3 +108,10 @@ class AssetInventoryOverview(BaseModel):
     groups_count: int
     last_seen_at: Optional[datetime] = None
     updated_at: datetime
+
+
+class AssetInventoryPage(BaseModel):
+    items: List[AssetInventoryOverview]
+    limit: int
+    offset: int
+    total: int
