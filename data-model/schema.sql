@@ -150,8 +150,8 @@ CREATE TABLE local_groups (
 
 CREATE TABLE local_group_members (
     group_id UUID NOT NULL REFERENCES local_groups(group_id),
-    user_id UUID NOT NULL REFERENCES local_users(user_id),
-    PRIMARY KEY (group_id, user_id)
+    member_name TEXT NOT NULL,
+    PRIMARY KEY (group_id, member_name)
 );
 
 -- Telemetry Metrics
