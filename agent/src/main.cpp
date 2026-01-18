@@ -1,6 +1,7 @@
 #include "agent_config.h"
 #include "agent_crash.h"
 #include "agent_heartbeat.h"
+#include "agent_id.h"
 #include "agent_integrity.h"
 #include "agent_retry.h"
 #include "agent_uptime.h"
@@ -8,24 +9,8 @@
 
 #include <chrono>
 #include <iostream>
-#include <random>
-#include <sstream>
 #include <string>
 #include <thread>
-
-namespace {
-std::string GenerateEventId() {
-    std::ostringstream stream;
-    std::random_device device;
-    std::mt19937 generator(device());
-    std::uniform_int_distribution<int> dist(0, 255);
-    stream << std::hex;
-    for (int i = 0; i < 16; ++i) {
-        stream << dist(generator);
-    }
-    return stream.str();
-}
-}  // namespace
 
 int main() {
     try {
@@ -48,7 +33,7 @@ int main() {
         watchdog.Start();
 
         while (true) {
-            std::string event_id = GenerateEventId();
+            std::string event_id = agent::GenerateEventId();
             agent::HeartbeatPayload payload =
                 agent::BuildHeartbeatPayload(config, event_id, uptime.UptimeSeconds());
 

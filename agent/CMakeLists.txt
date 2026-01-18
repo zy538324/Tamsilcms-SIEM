@@ -11,6 +11,7 @@ add_executable(agent_hello
     src/main.cpp
     src/agent_config.cpp
     src/agent_crash.cpp
+    src/agent_id.cpp
     src/agent_signing.cpp
     src/agent_heartbeat.cpp
     src/agent_integrity.cpp
