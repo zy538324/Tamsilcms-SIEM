@@ -18,6 +18,7 @@ struct Config {
     std::string identity_header;
     int heartbeat_interval_seconds;
     int watchdog_timeout_seconds;
+    int max_heartbeat_interval_seconds;
     std::string expected_binary_hash;
 };
 
