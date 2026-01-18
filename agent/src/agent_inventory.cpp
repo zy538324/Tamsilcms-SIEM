@@ -81,6 +81,7 @@ bool SendInventorySnapshot(const Config& config) {
              << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\"," 
              << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\"," 
              << "\"collected_at\":\"" << collected_at << "\"," 
+             << "\"hostname\":\"" << JsonEscape(config.hostname) << "\"," 
              << "\"manufacturer\":null,"
              << "\"model\":null,"
              << "\"serial_number\":null,"
@@ -95,6 +96,7 @@ bool SendInventorySnapshot(const Config& config) {
        << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
        << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\","
        << "\"collected_at\":\"" << collected_at << "\","
+       << "\"hostname\":\"" << JsonEscape(config.hostname) << "\","
        << "\"os_name\":\"" << JsonEscape(config.os_name) << "\","
        << "\"os_version\":\"unknown\","
        << "\"kernel_version\":null,"
@@ -107,6 +109,7 @@ bool SendInventorySnapshot(const Config& config) {
              << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
              << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\","
              << "\"collected_at\":\"" << collected_at << "\","
+             << "\"hostname\":\"" << JsonEscape(config.hostname) << "\","
              << "\"items\":[]"
              << '}';
 
@@ -115,6 +118,7 @@ bool SendInventorySnapshot(const Config& config) {
           << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
           << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\","
           << "\"collected_at\":\"" << collected_at << "\","
+          << "\"hostname\":\"" << JsonEscape(config.hostname) << "\","
           << "\"users\":[]"
           << '}';
 
@@ -123,6 +127,7 @@ bool SendInventorySnapshot(const Config& config) {
            << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
            << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\","
            << "\"collected_at\":\"" << collected_at << "\","
+           << "\"hostname\":\"" << JsonEscape(config.hostname) << "\","
            << "\"groups\":[]"
            << '}';
 
