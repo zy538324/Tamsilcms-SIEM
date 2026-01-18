@@ -27,9 +27,6 @@ Config LoadConfig() {
     config.shared_key = GetEnv("AGENT_HMAC_SHARED_KEY", "");
     config.cert_fingerprint = GetEnv("AGENT_CERT_FINGERPRINT", "sha256:placeholder");
     config.identity_header = GetEnv("AGENT_IDENTITY", "agent-placeholder");
-    config.heartbeat_interval_seconds = std::stoi(GetEnv("AGENT_HEARTBEAT_INTERVAL", "45"));
-    config.watchdog_timeout_seconds = std::stoi(GetEnv("AGENT_WATCHDOG_TIMEOUT", "120"));
-    config.expected_binary_hash = GetEnv("AGENT_EXPECTED_SHA256", "");
     return config;
 }
 

@@ -16,9 +16,6 @@ struct Config {
     std::string shared_key;
     std::string cert_fingerprint;
     std::string identity_header;
-    int heartbeat_interval_seconds;
-    int watchdog_timeout_seconds;
-    std::string expected_binary_hash;
 };
 
 Config LoadConfig();
