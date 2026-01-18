@@ -50,6 +50,17 @@ class AgentStateResponse(BaseModel):
     trust_state: str
 
 
+class AgentPresenceResponse(BaseModel):
+    """Agent presence state for online/offline visibility."""
+
+    identity_id: str
+    hostname: str
+    os: str
+    trust_state: str
+    last_seen_at: datetime
+    status: str
+
+
 class RiskScoreResponse(BaseModel):
     """Risk score representation for MVP-2 visibility."""
 

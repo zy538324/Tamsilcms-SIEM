@@ -16,6 +16,7 @@ from .config import Settings, load_settings
 from .certificates import CertificateRecord, registry
 from .agents import AgentState, store as agent_store
 from .events import HeartbeatEvent, store
+from .online import evaluate_presence
 from .risk import store as risk_store
 from .models import (
     CertificateIssueRequest,
@@ -27,6 +28,7 @@ from .models import (
     HeartbeatEventResponse,
     AgentStateResponse,
     RiskScoreResponse,
+    AgentPresenceResponse,
 )
 from .security import SignatureError, verify_signature
 
@@ -181,6 +183,24 @@ async def list_agents() -> list[AgentStateResponse]:
             trust_state=agent.trust_state,
         )
         for agent in agents
+    ]
+
+
+@app.get("/agents/presence", response_model=list[AgentPresenceResponse])
+async def list_agent_presence(settings: Settings = Depends(get_settings)) -> list[AgentPresenceResponse]:
+    """Return agent online/offline presence based on last seen timestamp."""
+    agents = agent_store.list_all()
+    presence = evaluate_presence(agents, settings.heartbeat_offline_threshold_seconds)
+    return [
+        AgentPresenceResponse(
+            identity_id=agent.identity_id,
+            hostname=agent.hostname,
+            os=agent.os,
+            trust_state=agent.trust_state,
+            last_seen_at=agent.last_seen_at,
+            status=agent.status,
+        )
+        for agent in presence
     ]
 
 

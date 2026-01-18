@@ -16,6 +16,7 @@ class Settings:
     hmac_shared_key: str
     signature_ttl_seconds: int
     service_name: str
+    heartbeat_offline_threshold_seconds: int
 
 
 def load_settings() -> Settings:
@@ -25,5 +26,7 @@ def load_settings() -> Settings:
         hmac_shared_key=os.environ.get("IDENTITY_HMAC_SHARED_KEY", ""),
         signature_ttl_seconds=int(os.environ.get("IDENTITY_SIGNATURE_TTL", "120")),
         service_name=os.environ.get("IDENTITY_SERVICE_NAME", "identity-service"),
+        heartbeat_offline_threshold_seconds=int(
+            os.environ.get("IDENTITY_OFFLINE_THRESHOLD", "120")
+        ),
     )
-
