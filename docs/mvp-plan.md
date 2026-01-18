@@ -30,3 +30,11 @@ Create an irreversible baseline so architectural drift is impossible.
 **Exit Condition**
 Repo exists, build pipelines stubbed, no functionality yet, but rules are locked.
 
+## MVP-1 — Secure Identity & Transport Plane
+
+**Objective**
+Nothing runs unless identity and trust are solved.
+
+**Exit Condition**
+An agent can cryptographically authenticate to the platform and exchange a signed “hello”.
+
