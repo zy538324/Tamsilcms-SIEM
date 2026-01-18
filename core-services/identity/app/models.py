@@ -40,6 +40,16 @@ class HeartbeatEventResponse(BaseModel):
     received_at: datetime
 
 
+class AgentStateResponse(BaseModel):
+    """Agent state representation for MVP-2 visibility."""
+
+    identity_id: str
+    hostname: str
+    os: str
+    last_seen_at: datetime
+    trust_state: str
+
+
 class CertificateIssueRequest(BaseModel):
     """Request to register a new client certificate fingerprint."""
 

@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from .config import Settings, load_settings
 from .certificates import CertificateRecord, registry
+from .agents import AgentState, store as agent_store
 from .events import HeartbeatEvent, store
 from .models import (
     CertificateIssueRequest,
@@ -23,6 +24,7 @@ from .models import (
     HelloRequest,
     HelloResponse,
     HeartbeatEventResponse,
+    AgentStateResponse,
 )
 from .security import SignatureError, verify_signature
 
@@ -86,6 +88,18 @@ async def hello(
             detail="missing_transport_identity",
         )
 
+    if not registry.is_known(client_cert_fingerprint):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="unknown_certificate",
+        )
+
+    if registry.is_revoked(client_cert_fingerprint):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="revoked_certificate",
+        )
+
     try:
         timestamp_int = int(timestamp)
     except ValueError as exc:
@@ -115,6 +129,12 @@ async def hello(
             received_at=datetime.now(timezone.utc),
         )
     )
+    agent_store.upsert(
+        identity_id=payload.identity_id,
+        hostname=payload.hostname,
+        os_name=payload.os,
+        trust_state=payload.trust_state,
+    )
 
     return HelloResponse(
         status="verified",
@@ -138,6 +158,22 @@ async def list_heartbeats() -> list[HeartbeatEventResponse]:
             received_at=event.received_at,
         )
         for event in events
+    ]
+
+
+@app.get("/agents", response_model=list[AgentStateResponse])
+async def list_agents() -> list[AgentStateResponse]:
+    """Return current agent states (in-memory)."""
+    agents = agent_store.list_all()
+    return [
+        AgentStateResponse(
+            identity_id=agent.identity_id,
+            hostname=agent.hostname,
+            os=agent.os,
+            last_seen_at=agent.last_seen_at,
+            trust_state=agent.trust_state,
+        )
+        for agent in agents
     ]
 
 

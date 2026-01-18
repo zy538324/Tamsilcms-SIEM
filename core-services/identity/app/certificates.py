@@ -43,5 +43,12 @@ class CertificateRegistry:
     def get(self, fingerprint: str) -> Optional[CertificateRecord]:
         return self._records.get(fingerprint)
 
+    def is_known(self, fingerprint: str) -> bool:
+        return fingerprint in self._records
+
+    def is_revoked(self, fingerprint: str) -> bool:
+        record = self._records.get(fingerprint)
+        return record is not None and record.revoked_at is not None
+
 
 registry = CertificateRegistry()
