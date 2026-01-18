@@ -8,6 +8,7 @@ from typing import List, Optional
 import asyncpg
 
 from .models import (
+    AssetInventoryOverview,
     AssetRecord,
     AssetStateResponse,
     HardwareInventory,
@@ -307,7 +308,12 @@ class InventoryStore:
             groups=groups,
         )
 
-    async def list_assets(self, tenant_id: Optional[str] = None) -> List[AssetRecord]:
+    async def list_assets(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[AssetRecord]:
         if tenant_id:
             rows = await self.pool.fetch(
                 """
@@ -323,8 +329,11 @@ class InventoryStore:
                 FROM assets
                 WHERE tenant_id = $1
                 ORDER BY updated_at DESC
+                LIMIT $2 OFFSET $3
                 """,
                 tenant_id,
+                limit,
+                offset,
             )
         else:
             rows = await self.pool.fetch(
@@ -340,7 +349,10 @@ class InventoryStore:
                        updated_at
                 FROM assets
                 ORDER BY updated_at DESC
+                LIMIT $1 OFFSET $2
                 """,
+                limit,
+                offset,
             )
         return [
             AssetRecord(
@@ -358,7 +370,10 @@ class InventoryStore:
         ]
 
     async def list_asset_states(
-        self, tenant_id: Optional[str] = None
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> List[AssetStateResponse]:
         base_query = """
             SELECT a.asset_id,
@@ -388,12 +403,17 @@ class InventoryStore:
         """
         if tenant_id:
             rows = await self.pool.fetch(
-                base_query + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC",
+                base_query
+                + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
                 tenant_id,
+                limit,
+                offset,
             )
         else:
             rows = await self.pool.fetch(
-                base_query + " ORDER BY a.updated_at DESC",
+                base_query + " ORDER BY a.updated_at DESC LIMIT $1 OFFSET $2",
+                limit,
+                offset,
             )
         return [
             AssetStateResponse(
@@ -407,6 +427,128 @@ class InventoryStore:
             )
             for row in rows
         ]
+
+    async def list_asset_overviews(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[AssetInventoryOverview]:
+        base_query = """
+            SELECT a.asset_id,
+                   a.tenant_id,
+                   a.hostname,
+                   a.last_seen_at,
+                   a.updated_at,
+                   os.os_name,
+                   os.os_version,
+                   hw.model AS hardware_model,
+                   COALESCE(sw.software_count, 0) AS software_count,
+                   COALESCE(u.user_count, 0) AS users_count,
+                   COALESCE(g.group_count, 0) AS groups_count
+            FROM assets a
+            LEFT JOIN os_inventory os ON os.asset_id = a.asset_id
+            LEFT JOIN hardware_inventory hw ON hw.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS software_count
+                FROM software_inventory
+                GROUP BY asset_id
+            ) sw ON sw.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS user_count
+                FROM local_users
+                GROUP BY asset_id
+            ) u ON u.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS group_count
+                FROM local_groups
+                GROUP BY asset_id
+            ) g ON g.asset_id = a.asset_id
+        """
+        if tenant_id:
+            rows = await self.pool.fetch(
+                base_query
+                + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
+                tenant_id,
+                limit,
+                offset,
+            )
+        else:
+            rows = await self.pool.fetch(
+                base_query + " ORDER BY a.updated_at DESC LIMIT $1 OFFSET $2",
+                limit,
+                offset,
+            )
+        return [
+            AssetInventoryOverview(
+                asset_id=str(row["asset_id"]),
+                tenant_id=str(row["tenant_id"]),
+                hostname=row["hostname"],
+                os_name=row["os_name"],
+                os_version=row["os_version"],
+                hardware_model=row["hardware_model"],
+                software_count=row["software_count"],
+                users_count=row["users_count"],
+                groups_count=row["groups_count"],
+                last_seen_at=row["last_seen_at"],
+                updated_at=row["updated_at"],
+            )
+            for row in rows
+        ]
+
+    async def get_asset_overview(
+        self, asset_id: str
+    ) -> Optional[AssetInventoryOverview]:
+        row = await self.pool.fetchrow(
+            """
+            SELECT a.asset_id,
+                   a.tenant_id,
+                   a.hostname,
+                   a.last_seen_at,
+                   a.updated_at,
+                   os.os_name,
+                   os.os_version,
+                   hw.model AS hardware_model,
+                   COALESCE(sw.software_count, 0) AS software_count,
+                   COALESCE(u.user_count, 0) AS users_count,
+                   COALESCE(g.group_count, 0) AS groups_count
+            FROM assets a
+            LEFT JOIN os_inventory os ON os.asset_id = a.asset_id
+            LEFT JOIN hardware_inventory hw ON hw.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS software_count
+                FROM software_inventory
+                GROUP BY asset_id
+            ) sw ON sw.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS user_count
+                FROM local_users
+                GROUP BY asset_id
+            ) u ON u.asset_id = a.asset_id
+            LEFT JOIN (
+                SELECT asset_id, COUNT(*) AS group_count
+                FROM local_groups
+                GROUP BY asset_id
+            ) g ON g.asset_id = a.asset_id
+            WHERE a.asset_id = $1
+            """,
+            asset_id,
+        )
+        if not row:
+            return None
+        return AssetInventoryOverview(
+            asset_id=str(row["asset_id"]),
+            tenant_id=str(row["tenant_id"]),
+            hostname=row["hostname"],
+            os_name=row["os_name"],
+            os_version=row["os_version"],
+            hardware_model=row["hardware_model"],
+            software_count=row["software_count"],
+            users_count=row["users_count"],
+            groups_count=row["groups_count"],
+            last_seen_at=row["last_seen_at"],
+            updated_at=row["updated_at"],
+        )
 
     async def _fetch_asset_context(self, asset_id: str) -> Optional[asyncpg.Record]:
         return await self.pool.fetchrow(

@@ -212,13 +212,17 @@ HardwareInfo CollectHardware() {
 
 OsInfo CollectOs(const Config& config) {
     OsInfo info{};
-    info.os_name = config.os_name;
+    info.os_name = config.os_name.empty() ? "unknown" : config.os_name;
+    info.os_version = "unknown";
 #if defined(_WIN32)
     return info;
 #else
-    info.os_version = ExtractOsReleaseValue("VERSION_ID");
-    if (!info.os_version) {
-        info.os_version = ExtractOsReleaseValue("PRETTY_NAME");
+    auto version_id = ExtractOsReleaseValue("VERSION_ID");
+    auto pretty_name = ExtractOsReleaseValue("PRETTY_NAME");
+    if (version_id && !version_id->empty()) {
+        info.os_version = *version_id;
+    } else if (pretty_name && !pretty_name->empty()) {
+        info.os_version = *pretty_name;
     }
     struct utsname uname_info {};
     if (uname(&uname_info) == 0) {
