@@ -27,3 +27,32 @@ class HelloResponse(BaseModel):
     received_at: datetime
     service: str
 
+
+class CertificateIssueRequest(BaseModel):
+    """Request to register a new client certificate fingerprint."""
+
+    identity_id: str = Field(..., min_length=8, max_length=64)
+    fingerprint_sha256: str = Field(..., min_length=8, max_length=128)
+    expires_at: datetime
+
+
+class CertificateIssueResponse(BaseModel):
+    """Response after certificate issuance registration."""
+
+    status: str
+    issued_at: datetime
+    expires_at: datetime
+
+
+class CertificateRevokeRequest(BaseModel):
+    """Request to revoke a certificate fingerprint."""
+
+    fingerprint_sha256: str = Field(..., min_length=8, max_length=128)
+    reason: str = Field(..., min_length=3, max_length=255)
+
+
+class CertificateRevokeResponse(BaseModel):
+    """Response after certificate revocation."""
+
+    status: str
+    revoked_at: datetime
