@@ -23,7 +23,17 @@ def derive_state(asset_id: str, snapshot: InventorySnapshot) -> AssetState:
     users_count = len(snapshot.users.users) if snapshot.users else 0
     groups_count = len(snapshot.groups.groups) if snapshot.groups else 0
 
-    hostname = snapshot.hardware.model if snapshot.hardware else None
+    hostname = None
+    for source in (
+        snapshot.hardware,
+        snapshot.os,
+        snapshot.software,
+        snapshot.users,
+        snapshot.groups,
+    ):
+        if source and source.hostname:
+            hostname = source.hostname
+            break
     os_name = snapshot.os.os_name if snapshot.os else None
     os_version = snapshot.os.os_version if snapshot.os else None
 
