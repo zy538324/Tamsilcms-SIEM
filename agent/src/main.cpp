@@ -1,4 +1,5 @@
 #include "agent_config.h"
+#include "agent_crash.h"
 #include "agent_heartbeat.h"
 #include "agent_integrity.h"
 #include "agent_retry.h"
@@ -28,6 +29,7 @@ std::string GenerateEventId() {
 
 int main() {
     try {
+        agent::InstallCrashHandler();
         agent::Config config = agent::LoadConfig();
         if (config.tenant_id.empty() || config.asset_id.empty() || config.identity_id.empty()) {
             std::cerr << "Missing canonical identifiers." << std::endl;
