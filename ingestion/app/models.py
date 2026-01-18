@@ -11,6 +11,7 @@ class InventoryBase(BaseModel):
     tenant_id: str = Field(..., min_length=8, max_length=64)
     asset_id: str = Field(..., min_length=8, max_length=64)
     collected_at: datetime
+    hostname: Optional[str] = None
 
 
 class HardwareInventory(InventoryBase):
@@ -58,7 +59,7 @@ class LocalUsersInventory(InventoryBase):
 class LocalGroup(BaseModel):
     name: str = Field(..., min_length=1, max_length=64)
     gid: Optional[str] = None
-    members: List[str] = []
+    members: List[str] = Field(default_factory=list)
 
 
 class LocalGroupsInventory(InventoryBase):
@@ -81,3 +82,29 @@ class AssetStateResponse(BaseModel):
     software_count: int
     users_count: int
     groups_count: int
+
+
+class AssetRecord(BaseModel):
+    asset_id: str
+    tenant_id: str
+    hostname: str
+    asset_type: str
+    environment: Optional[str] = None
+    status: str
+    criticality: Optional[str] = None
+    last_seen_at: Optional[datetime] = None
+    updated_at: datetime
+
+
+class AssetInventoryOverview(BaseModel):
+    asset_id: str
+    tenant_id: str
+    hostname: str
+    os_name: Optional[str] = None
+    os_version: Optional[str] = None
+    hardware_model: Optional[str] = None
+    software_count: int
+    users_count: int
+    groups_count: int
+    last_seen_at: Optional[datetime] = None
+    updated_at: datetime
