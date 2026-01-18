@@ -3,6 +3,7 @@
 #include "agent_heartbeat.h"
 #include "agent_id.h"
 #include "agent_integrity.h"
+#include "agent_inventory.h"
 #include "agent_retry.h"
 #include "agent_uptime.h"
 #include "agent_watchdog.h"
@@ -30,6 +31,9 @@ int main() {
         agent::HeartbeatWatchdog watchdog(std::chrono::seconds(config.watchdog_timeout_seconds));
         agent::UptimeTracker uptime;
         int failure_count = 0;
+        if (!agent::SendInventorySnapshot(config)) {
+            std::cerr << "Inventory snapshot failed." << std::endl;
+        }
         watchdog.Start();
 
         while (true) {

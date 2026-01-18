@@ -14,7 +14,15 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from .config import Settings, load_settings
-from .models import HelloRequest, HelloResponse
+from .models import (
+    HelloRequest,
+    HelloResponse,
+    HardwareInventory,
+    OsInventory,
+    SoftwareInventory,
+    LocalUsersInventory,
+    LocalGroupsInventory,
+)
 from .security import enforce_mtls_only, enforce_transport_identity
 from .trust import enforce_trusted_fingerprint, parse_fingerprints
 
@@ -94,3 +102,64 @@ async def mtls_hello(
         )
 
     return HelloResponse(**response.json())
+
+
+async def _forward_inventory(path: str, payload: dict, settings: Settings) -> dict:
+    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        response = await client.post(
+            f"{settings.ingestion_service_url}{path}",
+            json=payload,
+            headers={"X-Forwarded-Proto": "https"},
+        )
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.json().get("detail", "ingestion_error"),
+        )
+    return response.json()
+
+
+@app.post("/mtls/inventory/hardware", response_class=JSONResponse)
+async def mtls_inventory_hardware(
+    payload: HardwareInventory,
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+) -> dict:
+    return await _forward_inventory("/inventory/hardware", payload.model_dump(), settings)
+
+
+@app.post("/mtls/inventory/os", response_class=JSONResponse)
+async def mtls_inventory_os(
+    payload: OsInventory,
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+) -> dict:
+    return await _forward_inventory("/inventory/os", payload.model_dump(), settings)
+
+
+@app.post("/mtls/inventory/software", response_class=JSONResponse)
+async def mtls_inventory_software(
+    payload: SoftwareInventory,
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+) -> dict:
+    return await _forward_inventory("/inventory/software", payload.model_dump(), settings)
+
+
+@app.post("/mtls/inventory/users", response_class=JSONResponse)
+async def mtls_inventory_users(
+    payload: LocalUsersInventory,
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+) -> dict:
+    return await _forward_inventory("/inventory/users", payload.model_dump(), settings)
+
+
+@app.post("/mtls/inventory/groups", response_class=JSONResponse)
+async def mtls_inventory_groups(
+    payload: LocalGroupsInventory,
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+) -> dict:
+    return await _forward_inventory("/inventory/groups", payload.model_dump(), settings)

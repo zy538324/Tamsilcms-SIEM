@@ -27,3 +27,60 @@ class HelloResponse(BaseModel):
     received_at: datetime
     service: str
 
+
+class InventoryBase(BaseModel):
+    tenant_id: str = Field(..., min_length=8, max_length=64)
+    asset_id: str = Field(..., min_length=8, max_length=64)
+    collected_at: datetime
+
+
+class HardwareInventory(InventoryBase):
+    manufacturer: str | None = None
+    model: str | None = None
+    serial_number: str | None = None
+    cpu_model: str | None = None
+    cpu_cores: int | None = None
+    memory_mb: int | None = None
+    storage_gb: int | None = None
+
+
+class OsInventory(InventoryBase):
+    os_name: str = Field(..., min_length=1, max_length=64)
+    os_version: str = Field(..., min_length=1, max_length=64)
+    kernel_version: str | None = None
+    architecture: str | None = None
+    install_date: str | None = None
+
+
+class SoftwareItem(BaseModel):
+    name: str = Field(..., min_length=1, max_length=128)
+    vendor: str | None = None
+    version: str | None = None
+    install_date: str | None = None
+    source: str | None = None
+
+
+class SoftwareInventory(InventoryBase):
+    items: list[SoftwareItem]
+
+
+class LocalUser(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+    display_name: str | None = None
+    uid: str | None = None
+    is_admin: bool = False
+    last_login_at: datetime | None = None
+
+
+class LocalUsersInventory(InventoryBase):
+    users: list[LocalUser]
+
+
+class LocalGroup(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64)
+    gid: str | None = None
+    members: list[str] = []
+
+
+class LocalGroupsInventory(InventoryBase):
+    groups: list[LocalGroup]
