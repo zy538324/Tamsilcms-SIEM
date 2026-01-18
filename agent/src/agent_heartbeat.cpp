@@ -62,17 +62,19 @@ size_t WriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
 
 HeartbeatSender::HeartbeatSender(const Config& config) : config_(config) {}
 
-HeartbeatPayload BuildHeartbeatPayload(const Config& config, const std::string& event_id) {
+HeartbeatPayload BuildHeartbeatPayload(const Config& config,
+                                       const std::string& event_id,
+                                       long long uptime_seconds) {
     std::ostringstream payload;
     payload << '{'
-            << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\"," 
+            << "\"tenant_id\":\"" << JsonEscape(config.tenant_id) << "\","
             << "\"asset_id\":\"" << JsonEscape(config.asset_id) << "\"," 
             << "\"identity_id\":\"" << JsonEscape(config.identity_id) << "\"," 
             << "\"event_id\":\"" << JsonEscape(event_id) << "\"," 
             << "\"agent_version\":\"" << JsonEscape(config.agent_version) << "\"," 
             << "\"hostname\":\"" << JsonEscape(config.hostname) << "\"," 
-            << "\"os\":\"" << JsonEscape(config.os_name) << "\"," 
-            << "\"uptime_seconds\":" << 0 << ','
+            << "\"os\":\"" << JsonEscape(config.os_name) << "\","
+            << "\"uptime_seconds\":" << uptime_seconds << ','
             << "\"trust_state\":\"" << JsonEscape(config.trust_state) << "\"," 
             << "\"sent_at\":\"" << BuildTimestampIso8601() << "\"";
     payload << '}';

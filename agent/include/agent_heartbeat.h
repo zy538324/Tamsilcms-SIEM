@@ -22,6 +22,8 @@ class HeartbeatSender {
     Config config_;
 };
 
-HeartbeatPayload BuildHeartbeatPayload(const Config& config, const std::string& event_id);
+HeartbeatPayload BuildHeartbeatPayload(const Config& config,
+                                       const std::string& event_id,
+                                       long long uptime_seconds);
 
 }  // namespace agent
