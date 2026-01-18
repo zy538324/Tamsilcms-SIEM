@@ -308,7 +308,12 @@ class InventoryStore:
             groups=groups,
         )
 
-    async def list_assets(self, tenant_id: Optional[str] = None) -> List[AssetRecord]:
+    async def list_assets(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[AssetRecord]:
         if tenant_id:
             rows = await self.pool.fetch(
                 """
@@ -324,8 +329,11 @@ class InventoryStore:
                 FROM assets
                 WHERE tenant_id = $1
                 ORDER BY updated_at DESC
+                LIMIT $2 OFFSET $3
                 """,
                 tenant_id,
+                limit,
+                offset,
             )
         else:
             rows = await self.pool.fetch(
@@ -341,7 +349,10 @@ class InventoryStore:
                        updated_at
                 FROM assets
                 ORDER BY updated_at DESC
+                LIMIT $1 OFFSET $2
                 """,
+                limit,
+                offset,
             )
         return [
             AssetRecord(
@@ -359,7 +370,10 @@ class InventoryStore:
         ]
 
     async def list_asset_states(
-        self, tenant_id: Optional[str] = None
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> List[AssetStateResponse]:
         base_query = """
             SELECT a.asset_id,
@@ -389,12 +403,17 @@ class InventoryStore:
         """
         if tenant_id:
             rows = await self.pool.fetch(
-                base_query + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC",
+                base_query
+                + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
                 tenant_id,
+                limit,
+                offset,
             )
         else:
             rows = await self.pool.fetch(
-                base_query + " ORDER BY a.updated_at DESC",
+                base_query + " ORDER BY a.updated_at DESC LIMIT $1 OFFSET $2",
+                limit,
+                offset,
             )
         return [
             AssetStateResponse(
@@ -410,7 +429,10 @@ class InventoryStore:
         ]
 
     async def list_asset_overviews(
-        self, tenant_id: Optional[str] = None
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> List[AssetInventoryOverview]:
         base_query = """
             SELECT a.asset_id,
@@ -445,12 +467,17 @@ class InventoryStore:
         """
         if tenant_id:
             rows = await self.pool.fetch(
-                base_query + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC",
+                base_query
+                + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
                 tenant_id,
+                limit,
+                offset,
             )
         else:
             rows = await self.pool.fetch(
-                base_query + " ORDER BY a.updated_at DESC",
+                base_query + " ORDER BY a.updated_at DESC LIMIT $1 OFFSET $2",
+                limit,
+                offset,
             )
         return [
             AssetInventoryOverview(
