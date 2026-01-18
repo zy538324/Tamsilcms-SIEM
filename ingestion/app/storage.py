@@ -369,6 +369,26 @@ class InventoryStore:
             for row in rows
         ]
 
+    async def list_assets_page(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[List[AssetRecord], int]:
+        if tenant_id:
+            total = await self.pool.fetchval(
+                "SELECT COUNT(*) FROM assets WHERE tenant_id = $1",
+                tenant_id,
+            )
+        else:
+            total = await self.pool.fetchval("SELECT COUNT(*) FROM assets")
+        items = await self.list_assets(
+            tenant_id=tenant_id,
+            limit=limit,
+            offset=offset,
+        )
+        return items, int(total or 0)
+
     async def list_asset_states(
         self,
         tenant_id: Optional[str] = None,
@@ -427,6 +447,26 @@ class InventoryStore:
             )
             for row in rows
         ]
+
+    async def list_asset_states_page(
+        self,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[List[AssetStateResponse], int]:
+        if tenant_id:
+            total = await self.pool.fetchval(
+                "SELECT COUNT(*) FROM assets WHERE tenant_id = $1",
+                tenant_id,
+            )
+        else:
+            total = await self.pool.fetchval("SELECT COUNT(*) FROM assets")
+        items = await self.list_asset_states(
+            tenant_id=tenant_id,
+            limit=limit,
+            offset=offset,
+        )
+        return items, int(total or 0)
 
     async def list_asset_overviews(
         self,

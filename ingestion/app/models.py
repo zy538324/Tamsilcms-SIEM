@@ -96,6 +96,13 @@ class AssetRecord(BaseModel):
     updated_at: datetime
 
 
+class AssetRecordPage(BaseModel):
+    items: List[AssetRecord]
+    limit: int
+    offset: int
+    total: int
+
+
 class AssetInventoryOverview(BaseModel):
     asset_id: str
     tenant_id: str
@@ -108,6 +115,13 @@ class AssetInventoryOverview(BaseModel):
     groups_count: int
     last_seen_at: Optional[datetime] = None
     updated_at: datetime
+
+
+class AssetStatePage(BaseModel):
+    items: List[AssetStateResponse]
+    limit: int
+    offset: int
+    total: int
 
 
 class AssetInventoryPage(BaseModel):
