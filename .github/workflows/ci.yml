@@ -1,0 +1,18 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: MVP-0 Baseline Check
+        run: |
+          echo "MVP-0 baseline locked. No builds defined yet."
+
