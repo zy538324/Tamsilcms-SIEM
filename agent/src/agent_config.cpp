@@ -2,6 +2,8 @@
 
 #include <cstdlib>
 
+#include "agent_system.h"
+
 namespace agent {
 
 namespace {
@@ -22,7 +24,13 @@ Config LoadConfig() {
     config.identity_id = GetEnv("AGENT_IDENTITY_ID", "");
     config.agent_version = GetEnv("AGENT_VERSION", "0.1.0");
     config.hostname = GetEnv("AGENT_HOSTNAME", "");
+    if (config.hostname.empty()) {
+        config.hostname = DetectHostname();
+    }
     config.os_name = GetEnv("AGENT_OS_NAME", "");
+    if (config.os_name.empty()) {
+        config.os_name = DetectOsName();
+    }
     config.trust_state = GetEnv("AGENT_TRUST_STATE", "bootstrap");
     config.shared_key = GetEnv("AGENT_HMAC_SHARED_KEY", "");
     config.cert_fingerprint = GetEnv("AGENT_CERT_FINGERPRINT", "sha256:placeholder");
