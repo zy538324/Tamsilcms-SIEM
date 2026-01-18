@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from .config import Settings, load_settings
 from .certificates import CertificateRecord, registry
+from .events import HeartbeatEvent, store
 from .models import (
     CertificateIssueRequest,
     CertificateIssueResponse,
@@ -21,6 +22,7 @@ from .models import (
     CertificateRevokeResponse,
     HelloRequest,
     HelloResponse,
+    HeartbeatEventResponse,
 )
 from .security import SignatureError, verify_signature
 
@@ -102,11 +104,41 @@ async def hello(
             detail=reason,
         )
 
+    store.record(
+        HeartbeatEvent(
+            event_id=payload.event_id,
+            agent_id=payload.identity_id,
+            hostname=payload.hostname,
+            os=payload.os,
+            uptime_seconds=payload.uptime_seconds,
+            trust_state=payload.trust_state,
+            received_at=datetime.now(timezone.utc),
+        )
+    )
+
     return HelloResponse(
         status="verified",
         received_at=datetime.now(timezone.utc),
         service=settings.service_name,
     )
+
+
+@app.get("/heartbeats", response_model=list[HeartbeatEventResponse])
+async def list_heartbeats() -> list[HeartbeatEventResponse]:
+    """Return recent heartbeat events (in-memory)."""
+    events = store.list_recent()
+    return [
+        HeartbeatEventResponse(
+            event_id=event.event_id,
+            agent_id=event.agent_id,
+            hostname=event.hostname,
+            os=event.os,
+            uptime_seconds=event.uptime_seconds,
+            trust_state=event.trust_state,
+            received_at=event.received_at,
+        )
+        for event in events
+    ]
 
 
 @app.post("/certificates/issue", response_model=CertificateIssueResponse)

@@ -28,6 +28,18 @@ class HelloResponse(BaseModel):
     service: str
 
 
+class HeartbeatEventResponse(BaseModel):
+    """Heartbeat event representation for diagnostics."""
+
+    event_id: str
+    agent_id: str
+    hostname: str
+    os: str
+    uptime_seconds: int
+    trust_state: str
+    received_at: datetime
+
+
 class CertificateIssueRequest(BaseModel):
     """Request to register a new client certificate fingerprint."""
 
