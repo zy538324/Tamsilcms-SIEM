@@ -1,0 +1,10 @@
+^C:\USERS\MATT.PALMER\DOCUMENTS\GITHUB\TAMSILCMS-SIEM\AGENT\BUILD\CMAKEFILES\20AC9A0773512D309B6A0813E5BCD5D0\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent -BC:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/agent_hello.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
