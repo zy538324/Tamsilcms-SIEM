@@ -335,7 +335,7 @@ async def poll_tasks(
             detail=reason,
         )
 
-    tasks = task_store.list_pending(payload.asset_id)
+    tasks = task_store.list_pending(payload.tenant_id, payload.asset_id)
     for task in tasks:
         task_store.mark_delivered(task.task_id)
 

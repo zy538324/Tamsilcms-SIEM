@@ -64,13 +64,20 @@ class TaskStore:
         self._tasks[task.task_id] = task
         return task
 
-    def list_pending(self, asset_id: str, now: Optional[datetime] = None) -> List[Task]:
+    def list_pending(
+        self,
+        tenant_id: str,
+        asset_id: str,
+        now: Optional[datetime] = None,
+    ) -> List[Task]:
         timestamp = now or datetime.now(timezone.utc)
         self._expire_tasks(timestamp)
         return [
             task
             for task in self._tasks.values()
-            if task.asset_id == asset_id and task.state == "pending"
+            if task.asset_id == asset_id
+            and task.tenant_id == tenant_id
+            and task.state == "pending"
         ]
 
     def mark_delivered(self, task_id: str) -> Optional[Task]:
