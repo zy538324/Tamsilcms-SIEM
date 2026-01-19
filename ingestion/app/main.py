@@ -5,8 +5,19 @@ from datetime import datetime, timedelta, timezone
 import csv
 import io
 import asyncpg
-from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, status
+from uuid import UUID
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    status,
+)
 from fastapi.responses import JSONResponse, Response
+from pydantic import ValidationError
 
 from .config import Settings, load_settings
 from .models import (
@@ -29,10 +40,18 @@ from .models import (
     TelemetryMetricSummary,
     TelemetryBaseline,
     TelemetryAnomaly,
+    EventBatch,
+    EventClockDrift,
+    EventGapReport,
+    EventIngestResponse,
+    EventRecord,
+    EventTimeline,
 )
 from .storage import InventoryStore, TelemetryReplayError
 from .state import derive_state
 from .telemetry import TelemetryValidationError, metric_unit, normalise_samples
+from .events import EventValidationError, validate_batch
+from .security import verify_signature
 
 app = FastAPI(title="Ingestion Service", version="0.1.0")
 
@@ -300,6 +319,273 @@ async def list_telemetry_anomalies(
         since=since,
         limit=limit,
     )
+
+
+@app.post("/events", status_code=status.HTTP_202_ACCEPTED)
+async def ingest_events(
+    request: Request,
+    store: InventoryStore = Depends(get_store),
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+    signature: str | None = Header(None, alias="X-Request-Signature"),
+    timestamp: str | None = Header(None, alias="X-Request-Timestamp"),
+) -> EventIngestResponse:
+    raw_body = await request.body()
+    try:
+        batch = EventBatch.model_validate_json(raw_body)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="invalid_payload",
+        ) from exc
+
+    if await store.event_payload_exists(batch.payload_id):
+        await store.record_event_batch_log(
+            payload_id=batch.payload_id,
+            tenant_id=batch.tenant_id,
+            asset_id=batch.asset_id,
+            status="rejected",
+            signature=signature,
+            signature_verified=False,
+            event_count=len(batch.events),
+            accepted_count=0,
+            rejected_count=len(batch.events),
+            reject_reason="payload_replay",
+            schema_version=batch.schema_version,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="payload_replay",
+        )
+
+    if not signature or not timestamp:
+        await store.record_event_batch_log(
+            payload_id=batch.payload_id,
+            tenant_id=batch.tenant_id,
+            asset_id=batch.asset_id,
+            status="rejected",
+            signature=signature,
+            signature_verified=False,
+            event_count=len(batch.events),
+            accepted_count=0,
+            rejected_count=len(batch.events),
+            reject_reason="missing_signature_headers",
+            schema_version=batch.schema_version,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="missing_signature_headers",
+        )
+
+    try:
+        timestamp_int = int(timestamp)
+    except ValueError as exc:
+        await store.record_event_batch_log(
+            payload_id=batch.payload_id,
+            tenant_id=batch.tenant_id,
+            asset_id=batch.asset_id,
+            status="rejected",
+            signature=signature,
+            signature_verified=False,
+            event_count=len(batch.events),
+            accepted_count=0,
+            rejected_count=len(batch.events),
+            reject_reason="invalid_signature_timestamp",
+            schema_version=batch.schema_version,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_signature_timestamp",
+        ) from exc
+
+    valid, reason = verify_signature(settings, raw_body, signature, timestamp_int)
+    if not valid:
+        await store.record_event_batch_log(
+            payload_id=batch.payload_id,
+            tenant_id=batch.tenant_id,
+            asset_id=batch.asset_id,
+            status="rejected",
+            signature=signature,
+            signature_verified=False,
+            event_count=len(batch.events),
+            accepted_count=0,
+            rejected_count=len(batch.events),
+            reject_reason=reason,
+            schema_version=batch.schema_version,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=reason,
+        )
+
+    try:
+        validate_batch(batch, settings.event_batch_limit)
+    except EventValidationError as exc:
+        await store.record_event_batch_log(
+            payload_id=batch.payload_id,
+            tenant_id=batch.tenant_id,
+            asset_id=batch.asset_id,
+            status="rejected",
+            signature=signature,
+            signature_verified=True,
+            event_count=len(batch.events),
+            accepted_count=0,
+            rejected_count=len(batch.events),
+            reject_reason=exc.reason,
+            schema_version=batch.schema_version,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.reason,
+        ) from exc
+
+    gaps, drifts, accepted, rejected = await store.ingest_event_batch(
+        batch=batch,
+        signature=signature,
+        signature_verified=True,
+        event_stale_seconds=settings.event_stale_seconds,
+        event_future_seconds=settings.event_future_seconds,
+        clock_drift_seconds=settings.event_clock_drift_seconds,
+    )
+    status_value = "accepted" if rejected == 0 else "partial"
+    return EventIngestResponse(
+        status=status_value,
+        accepted=accepted,
+        rejected=rejected,
+        gaps=gaps,
+        drifts=drifts,
+    )
+
+
+@app.get("/events/recent", response_model=list[EventRecord])
+async def list_recent_events(
+    tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    limit: int = Query(default=200, ge=1, le=1000),
+    since: datetime | None = Query(default=None),
+    event_category: str | None = Query(default=None, min_length=3, max_length=32),
+    event_type: str | None = Query(default=None, min_length=3, max_length=80),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[EventRecord]:
+    return await store.list_recent_events(
+        tenant_id=tenant_id,
+        limit=limit,
+        since=since,
+        event_category=event_category,
+        event_type=event_type,
+    )
+
+
+@app.get("/events/{event_id}", response_model=EventRecord)
+async def get_event(
+    event_id: str,
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> EventRecord:
+    event = await store.get_event(UUID(event_id))
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="event_not_found",
+        )
+    return event
+
+
+@app.get("/events/assets/{asset_id}/timeline", response_model=EventTimeline)
+async def get_asset_timeline(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    since: datetime | None = Query(default=None),
+    until: datetime | None = Query(default=None),
+    limit: int = Query(default=500, ge=1, le=5000),
+    event_category: str | None = Query(default=None, min_length=3, max_length=32),
+    event_type: str | None = Query(default=None, min_length=3, max_length=80),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> EventTimeline:
+    return await store.get_asset_timeline(
+        asset_id=asset_id,
+        limit=limit,
+        since=since,
+        until=until,
+        event_category=event_category,
+        event_type=event_type,
+    )
+
+
+@app.get("/events/assets/{asset_id}/gaps", response_model=list[EventGapReport])
+async def list_event_gaps(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    limit: int = Query(default=100, ge=1, le=1000),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[EventGapReport]:
+    return await store.list_event_gaps(asset_id=asset_id, limit=limit)
+
+
+@app.get("/events/assets/{asset_id}/clock-drifts", response_model=list[EventClockDrift])
+async def list_event_drifts(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    limit: int = Query(default=100, ge=1, le=1000),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[EventClockDrift]:
+    return await store.list_event_drifts(asset_id=asset_id, limit=limit)
+
+
+@app.get("/events/assets/{asset_id}/export.csv", response_class=Response)
+async def export_asset_events(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    limit: int = Query(default=2000, ge=1, le=10000),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> Response:
+    timeline = await store.get_asset_timeline(
+        asset_id=asset_id,
+        limit=limit,
+        since=None,
+        until=None,
+        event_category=None,
+        event_type=None,
+    )
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "event_id",
+            "tenant_id",
+            "asset_id",
+            "event_type",
+            "event_category",
+            "source_module",
+            "trust_level",
+            "severity",
+            "sequence_number",
+            "timestamp_local",
+            "timestamp_received",
+            "payload_hash",
+            "payload",
+        ]
+    )
+    for event in timeline.events:
+        writer.writerow(
+            [
+                event.event_id,
+                event.tenant_id,
+                event.asset_id,
+                event.event_type,
+                event.event_category,
+                event.source_module,
+                event.trust_level,
+                event.severity,
+                event.sequence_number,
+                event.timestamp_local.isoformat(),
+                event.timestamp_received.isoformat(),
+                event.payload_hash,
+                event.payload,
+            ]
+        )
+    return Response(content=buffer.getvalue(), media_type="text/csv")
+
 
 @app.post("/inventory/os", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_os(
