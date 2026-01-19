@@ -40,6 +40,8 @@ def build_execution_plan(
         post_checks=["reboot_state", "service_health", "patch_rescan"],
         rollback_plan=["package_rollback", "restore_point"],
         eligibility=eligibility.decisions,
+        pre_check_results=[],
+        post_check_results=[],
     )
 
 

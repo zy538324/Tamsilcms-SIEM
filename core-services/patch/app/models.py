@@ -116,11 +116,38 @@ class ExecutionPlan(BaseModel):
     post_checks: list[str]
     rollback_plan: list[str]
     eligibility: list[EligibilityDecision]
+    pre_check_results: list[str] = Field(default_factory=list)
+    post_check_results: list[str] = Field(default_factory=list)
 
 
 class ExecutionPlanResponse(BaseModel):
     status: Literal["planned"]
     plan: ExecutionPlan
+
+
+class PlanStartRequest(BaseModel):
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    asset_id: str = Field(..., min_length=3, max_length=64)
+    started_at: datetime
+
+
+class PlanStartResponse(BaseModel):
+    status: Literal["executing"]
+    plan_id: UUID
+    started_at: datetime
+
+
+class PlanCheckRequest(BaseModel):
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    asset_id: str = Field(..., min_length=3, max_length=64)
+    checks: list[str] = Field(..., min_length=1)
+    phase: Literal["pre", "post"]
+    recorded_at: datetime
+
+
+class PlanCheckResponse(BaseModel):
+    status: Literal["recorded"]
+    plan_id: UUID
 
 
 class ExecutionResult(BaseModel):

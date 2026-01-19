@@ -12,6 +12,8 @@ creates policy-bound execution plans, and records evidence for compliance.
 - `POST /detections`: ingest normalised patch detections.
 - `POST /policies`: create or update a signed policy definition.
 - `POST /plans`: generate a policy-driven execution plan.
+- `POST /plans/{plan_id}/start`: mark a plan as executing.
+- `POST /plans/{plan_id}/checks`: record pre/post-check results.
 - `POST /plans/{plan_id}/results`: record execution results and verification.
 - `GET /plans/{plan_id}/tasks`: generate MVP-5 task manifest.
 - `POST /assets/block`: mark an asset as patch-blocked.

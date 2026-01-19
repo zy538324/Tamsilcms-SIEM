@@ -26,6 +26,10 @@ from .models import (
     ExecutionPlanResponse,
     ExecutionResultRequest,
     ExecutionResultResponse,
+    PlanCheckRequest,
+    PlanCheckResponse,
+    PlanStartRequest,
+    PlanStartResponse,
     PatchPolicy,
     PolicyResponse,
     TaskManifest,
@@ -293,6 +297,61 @@ async def create_plan(
             detail=str(exc),
         ) from exc
     return ExecutionPlanResponse(status="planned", plan=plan)
+
+
+@app.post("/plans/{plan_id}/start", response_model=PlanStartResponse)
+async def start_plan(
+    plan_id: UUID,
+    payload: PlanStartRequest,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> PlanStartResponse:
+    """Mark an execution plan as executing."""
+    plan_data = store.get_plan(plan_id)
+    if not plan_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="plan_not_found",
+        )
+    plan = ExecutionPlan.model_validate(plan_data)
+    if plan.tenant_id != payload.tenant_id or plan.asset_id != payload.asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="plan_scope_mismatch",
+        )
+    plan.status = "executing"
+    store.update_plan(plan)
+    return PlanStartResponse(status="executing", plan_id=plan_id, started_at=payload.started_at)
+
+
+@app.post("/plans/{plan_id}/checks", response_model=PlanCheckResponse)
+async def record_plan_checks(
+    plan_id: UUID,
+    payload: PlanCheckRequest,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> PlanCheckResponse:
+    """Record pre/post-check results for a plan."""
+    plan_data = store.get_plan(plan_id)
+    if not plan_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="plan_not_found",
+        )
+    plan = ExecutionPlan.model_validate(plan_data)
+    if plan.tenant_id != payload.tenant_id or plan.asset_id != payload.asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="plan_scope_mismatch",
+        )
+    if payload.phase == "pre":
+        plan.pre_check_results.extend(payload.checks)
+    else:
+        plan.post_check_results.extend(payload.checks)
+    store.update_plan(plan)
+    return PlanCheckResponse(status="recorded", plan_id=plan_id)
 
 
 @app.get("/plans/{plan_id}", response_model=ExecutionPlan)
