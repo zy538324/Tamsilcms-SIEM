@@ -79,6 +79,11 @@ def validate_sample_count(payload: TelemetryPayload) -> None:
         raise TelemetryValidationError("samples_required")
 
 
+def validate_schema_version(payload: TelemetryPayload) -> None:
+    if payload.schema_version != "v1":
+        raise TelemetryValidationError("schema_version_unsupported")
+
+
 async def enforce_https(request: Request) -> None:
     forwarded_proto = request.headers.get("x-forwarded-proto", "http")
     if forwarded_proto.lower() != "https":
@@ -168,6 +173,7 @@ async def ingest_telemetry(
             detail="payload_in_future",
         )
     try:
+        validate_schema_version(payload)
         validate_sample_count(payload)
         validate_sample_timestamps(
             payload=payload,
