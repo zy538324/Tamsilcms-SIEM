@@ -121,6 +121,31 @@ def _validate_expiry(settings: Settings, expires_at: datetime) -> None:
         )
 
 
+def _validate_result_timing(settings: Settings, started_at: datetime, finished_at: datetime, duration_ms: int) -> None:
+    if started_at.tzinfo is None or finished_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="result_requires_timezone",
+        )
+    if finished_at < started_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_result_timing",
+        )
+    elapsed_ms = int((finished_at - started_at).total_seconds() * 1000)
+    max_duration_ms = settings.task_max_ttl_seconds * 1000
+    if duration_ms < 0 or duration_ms > max_duration_ms:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_result_duration",
+        )
+    if abs(duration_ms - elapsed_ms) > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="duration_mismatch",
+        )
+
+
 @app.get("/health", response_class=JSONResponse)
 async def health_check(settings: Settings = Depends(get_settings)) -> dict:
     """Simple health endpoint for load balancers."""
@@ -401,11 +426,12 @@ async def record_task_result(
             detail="invalid_result_status",
         )
 
-    if payload.finished_at < payload.started_at:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="invalid_result_timing",
-        )
+    _validate_result_timing(
+        settings,
+        payload.started_at,
+        payload.finished_at,
+        payload.duration_ms,
+    )
 
     _validate_output_limit(settings, payload.stdout, "stdout")
     _validate_output_limit(settings, payload.stderr, "stderr")
@@ -421,6 +447,7 @@ async def record_task_result(
         duration_ms=payload.duration_ms,
         truncated=payload.truncated,
     )
+    task_store.expire_overdue()
     task = task_store.get(task_id)
     if not task:
         raise HTTPException(

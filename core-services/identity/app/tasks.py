@@ -116,6 +116,10 @@ class TaskStore:
     def get(self, task_id: str) -> Optional[Task]:
         return self._tasks.get(task_id)
 
+    def expire_overdue(self, now: Optional[datetime] = None) -> None:
+        timestamp = now or datetime.now(timezone.utc)
+        self._expire_tasks(timestamp)
+
     def _expire_tasks(self, now: datetime) -> None:
         for task in self._tasks.values():
             if task.state in {"pending", "delivered", "executing"} and task.expires_at <= now:
