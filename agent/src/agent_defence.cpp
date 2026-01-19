@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
+#include <functional>
 #include <iomanip>
 #include <sstream>
 
@@ -97,6 +98,21 @@ std::string ResponseActionName(ResponseAction action) {
             return "unknown";
     }
 }
+
+std::string BuildEvidenceId(const std::string& finding_id, const std::string& timestamp) {
+    std::size_t hash_value = std::hash<std::string>{}(finding_id + ":" + timestamp);
+    std::ostringstream stream;
+    stream << "EVID-" << std::hex << hash_value;
+    return stream.str();
+}
+
+std::string BuildStateSnapshot(const DefenceFinding& finding) {
+    std::ostringstream stream;
+    stream << "process_id=" << finding.process_id
+           << ";file_path=" << finding.file_path
+           << ";command_line=" << finding.command_line;
+    return stream.str();
+}
 }  // namespace
 
 DefencePolicy BuildDefaultDefencePolicy() {
@@ -134,6 +150,7 @@ std::string BuildFindingPayload(const DefenceFinding& finding) {
 std::string BuildEvidencePayload(const DefenceEvidence& evidence) {
     std::ostringstream stream;
     stream << "{"
+           << "\"evidence_id\":\"" << EscapeJsonString(evidence.evidence_id) << "\","
            << "\"finding_id\":\"" << EscapeJsonString(evidence.finding_id) << "\","
            << "\"policy_id\":\"" << EscapeJsonString(evidence.policy_id) << "\","
            << "\"action\":\"" << ResponseActionName(evidence.action) << "\","
@@ -219,11 +236,12 @@ DefenceEvidence DefenceModule::ApplyResponse(const DefenceFinding& finding) {
     evidence.finding_id = finding.detection_id;
     evidence.policy_id = policy_.policy_id;
     evidence.timestamp = ToIsoTimestamp(std::chrono::system_clock::now());
+    evidence.evidence_id = BuildEvidenceId(evidence.finding_id, evidence.timestamp);
     evidence.action = finding.proposed_response;
     evidence.permitted_by_policy = IsResponseAllowed(finding.proposed_response);
     evidence.decision_reason = finding.decision_reason;
-    evidence.before_state = "capture-before-state";
-    evidence.after_state = "capture-after-state";
+    evidence.before_state = BuildStateSnapshot(finding);
+    evidence.after_state = "response=" + ResponseActionName(evidence.action);
 
     if (evidence.action != ResponseAction::kObserveOnly && evidence.permitted_by_policy) {
         RecordActionTimestamp();

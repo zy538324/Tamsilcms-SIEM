@@ -55,6 +55,7 @@ struct DefenceFinding {
 };
 
 struct DefenceEvidence {
+    std::string evidence_id;
     std::string finding_id;
     std::string policy_id;
     ResponseAction action;
