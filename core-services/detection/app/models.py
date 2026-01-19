@@ -213,3 +213,17 @@ class SuppressionDecision(BaseModel):
     identity_id: str
     reason: str
     suppressed_at: datetime
+
+
+class DismissalDecision(BaseModel):
+    """Audit record for dismissal decisions."""
+
+    dismissal_id: UUID
+    finding_id: UUID
+    identity_id: str
+    reason: str
+    dismissed_at: datetime
+
+
+class DismissalListResponse(BaseModel):
+    dismissals: list[DismissalDecision]

@@ -8,6 +8,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 from .models import (
+    DismissalDecision,
     EventIngestRequest,
     Finding,
     FindingState,
@@ -124,12 +125,34 @@ class SuppressionStore:
         return list(self._decisions)
 
 
+class DismissalStore:
+    """Store for dismissal decisions and reasons."""
+
+    def __init__(self) -> None:
+        self._decisions: list[DismissalDecision] = []
+
+    def record(self, finding_id: UUID, identity_id: str, reason: str, dismissed_at: datetime) -> DismissalDecision:
+        decision = DismissalDecision(
+            dismissal_id=uuid4(),
+            finding_id=finding_id,
+            identity_id=identity_id,
+            reason=reason,
+            dismissed_at=dismissed_at,
+        )
+        self._decisions.append(decision)
+        return decision
+
+    def list(self) -> list[DismissalDecision]:
+        return list(self._decisions)
+
+
 @dataclass
 class Stores:
     events: EventStore
     rules: RuleStore
     findings: FindingStore
     suppressions: SuppressionStore
+    dismissals: DismissalStore
 
 
 store: Stores | None = None
@@ -143,5 +166,6 @@ def init_stores(event_retention: int, finding_retention: int) -> Stores:
         rules=RuleStore(),
         findings=FindingStore(retention=finding_retention),
         suppressions=SuppressionStore(),
+        dismissals=DismissalStore(),
     )
     return store

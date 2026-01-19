@@ -13,6 +13,7 @@ from .engine import evaluate_event
 from .models import (
     DismissFindingRequest,
     DismissFindingResponse,
+    DismissalListResponse,
     EventIngestRequest,
     EventIngestResponse,
     FindingListResponse,
@@ -23,6 +24,7 @@ from .models import (
 )
 from .rules import default_rules
 from .store import init_stores, store
+from .validation import validate_rule_definition
 
 app = FastAPI(title="Detection & Correlation Service", version="0.1.0")
 
@@ -32,6 +34,7 @@ async def startup() -> None:
     settings = load_settings()
     init_stores(settings.retention_events, settings.retention_findings)
     for rule in default_rules():
+        validate_rule_definition(rule, settings)
         store.rules.add(rule)
 
 
@@ -83,6 +86,9 @@ async def add_rule(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="client_identity_required")
     if store is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="store_unavailable")
+    if store.rules.get(payload.rule_id):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="rule_already_exists")
+    validate_rule_definition(payload, settings)
     store.rules.add(payload)
     return RuleResponse(status="recorded", rule=payload)
 
@@ -159,6 +165,12 @@ async def dismiss_finding(
     updated = store.findings.dismiss(finding_id)
     if not updated:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="dismiss_failed")
+    store.dismissals.record(
+        finding_id=finding_id,
+        identity_id=payload.identity_id,
+        reason=payload.reason,
+        dismissed_at=payload.dismissed_at,
+    )
     return DismissFindingResponse(status="dismissed", finding_id=finding_id, dismissed_at=payload.dismissed_at)
 
 
@@ -168,3 +180,11 @@ async def list_suppressions(settings: Settings = Depends(get_settings)) -> dict:
     if store is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="store_unavailable")
     return {"decisions": store.suppressions.list()}
+
+
+@app.get("/dismissals", response_model=DismissalListResponse)
+async def list_dismissals(settings: Settings = Depends(get_settings)) -> DismissalListResponse:
+    """List dismissal decisions for auditing."""
+    if store is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="store_unavailable")
+    return DismissalListResponse(dismissals=store.dismissals.list())
