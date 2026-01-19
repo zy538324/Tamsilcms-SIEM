@@ -1504,6 +1504,13 @@ class InventoryStore:
             schema_version,
         )
 
+    async def event_payload_exists(self, payload_id: UUID) -> bool:
+        existing = await self.pool.fetchval(
+            "SELECT 1 FROM event_ingest_log WHERE payload_id = $1",
+            payload_id,
+        )
+        return existing is not None
+
     async def ingest_event_batch(
         self,
         batch: EventBatch,

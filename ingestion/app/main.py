@@ -339,6 +339,12 @@ async def ingest_events(
             detail="invalid_payload",
         ) from exc
 
+    if await store.event_payload_exists(batch.payload_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="payload_replay",
+        )
+
     if not signature or not timestamp:
         await store.record_event_batch_log(
             payload_id=batch.payload_id,
