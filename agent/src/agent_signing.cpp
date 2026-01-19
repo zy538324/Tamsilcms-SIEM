@@ -11,20 +11,11 @@ namespace agent {
 
 namespace {
 std::string Base64Encode(const unsigned char* input, size_t length) {
-    BIO* bio = BIO_new(BIO_s_mem());
-    BIO* b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    bio = BIO_push(b64, bio);
-
-    BIO_write(bio, input, static_cast<int>(length));
-    BIO_flush(bio);
-
-    BUF_MEM* buffer = nullptr;
-    BIO_get_mem_ptr(bio, &buffer);
-    std::string result(buffer->data, buffer->length);
-
-    BIO_free_all(bio);
-    return result;
+    // Use EVP_EncodeBlock to avoid direct access to OpenSSL internal structs (BUF_MEM may be opaque)
+    int out_len = 4 * static_cast<int>((length + 2) / 3);
+    std::vector<unsigned char> out(out_len + 1);
+    int encoded_len = EVP_EncodeBlock(out.data(), input, static_cast<int>(length));
+    return std::string(reinterpret_cast<char*>(out.data()), encoded_len);
 }
 }  // namespace
 
