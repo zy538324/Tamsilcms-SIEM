@@ -193,6 +193,21 @@ class AssetBlockResponse(BaseModel):
     asset_state: AssetPatchState
 
 
+class ComplianceSummary(BaseModel):
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    compliant: int
+    pending: int
+    failed: int
+
+
+class AssetHistoryRecord(BaseModel):
+    plan_id: UUID
+    status: PlanStatus
+    recorded_at: datetime
+    verification_status: VerificationStatus
+    reboot_confirmed: bool
+
+
 class EvidenceRecord(BaseModel):
     plan_id: UUID
     detection_snapshot: DetectionBatch

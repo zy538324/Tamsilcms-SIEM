@@ -14,6 +14,8 @@ from .models import (
     AssetBlockRequest,
     AssetBlockResponse,
     AssetPatchState,
+    AssetHistoryRecord,
+    ComplianceSummary,
     DetectionBatch,
     DetectionResponse,
     EvidenceResponse,
@@ -107,6 +109,44 @@ def _validate_results(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="reboot_required_not_confirmed",
         )
+
+
+def _latest_detection_by_asset(detections: list[dict]) -> dict[str, dict]:
+    latest: dict[str, dict] = {}
+    for detection in detections:
+        asset_id = detection.get("asset_id")
+        if not asset_id:
+            continue
+        detected_at = detection.get("detected_at")
+        if asset_id not in latest or detected_at > latest[asset_id].get("detected_at"):
+            latest[asset_id] = detection
+    return latest
+
+
+def _compute_compliance_summary(tenant_id: str, store: PatchStore) -> ComplianceSummary:
+    detections = store.list_detections()
+    latest = _latest_detection_by_asset(detections)
+    compliant = 0
+    pending = 0
+    failed = 0
+    for asset_id, detection in latest.items():
+        if detection.get("tenant_id") != tenant_id:
+            continue
+        asset_state = store.get_asset_state(asset_id)
+        if asset_state and asset_state.get("status") == "patch_blocked":
+            failed += 1
+            continue
+        patches = detection.get("patches", [])
+        if not patches:
+            compliant += 1
+        else:
+            pending += 1
+    return ComplianceSummary(
+        tenant_id=tenant_id,
+        compliant=compliant,
+        pending=pending,
+        failed=failed,
+    )
 
 
 @app.get("/health", response_class=JSONResponse)
@@ -398,6 +438,39 @@ async def get_asset_state(
             detail="asset_state_not_found",
         )
     return AssetPatchState.model_validate(stored)
+
+
+@app.get("/assets/{asset_id}/history", response_model=list[AssetHistoryRecord])
+async def get_asset_history(
+    asset_id: str,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> list[AssetHistoryRecord]:
+    """Return patch execution history for an asset."""
+    records = []
+    for record in store.list_evidence_by_asset(asset_id):
+        records.append(
+            AssetHistoryRecord(
+                plan_id=UUID(record["plan_id"]),
+                status=record["plan_snapshot"]["status"],
+                recorded_at=datetime.fromisoformat(record["recorded_at"]),
+                verification_status=record["verification_status"],
+                reboot_confirmed=record["reboot_confirmed"],
+            )
+        )
+    return records
+
+
+@app.get("/compliance/{tenant_id}", response_model=ComplianceSummary)
+async def get_compliance_summary(
+    tenant_id: str,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> ComplianceSummary:
+    """Return a compliance summary for a tenant."""
+    return _compute_compliance_summary(tenant_id, store)
 
 
 @app.get("/plans/{plan_id}/tasks", response_model=TaskManifest)

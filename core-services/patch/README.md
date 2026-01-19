@@ -16,6 +16,8 @@ creates policy-bound execution plans, and records evidence for compliance.
 - `GET /plans/{plan_id}/tasks`: generate MVP-5 task manifest.
 - `POST /assets/block`: mark an asset as patch-blocked.
 - `GET /assets/{asset_id}/state`: retrieve asset patch state.
+- `GET /assets/{asset_id}/history`: list patch execution history.
+- `GET /compliance/{tenant_id}`: compliance overview for a tenant.
 - `GET /evidence/{plan_id}`: retrieve immutable evidence.
 
 ### Environment Variables

@@ -104,6 +104,16 @@ class PatchStore:
     def get_evidence(self, plan_id: UUID) -> Optional[dict]:
         return self._data["evidence"].get(str(plan_id))
 
+    def list_evidence_by_asset(self, asset_id: str) -> list[dict]:
+        return [
+            record
+            for record in self._data["evidence"].values()
+            if record.get("plan_snapshot", {}).get("asset_id") == asset_id
+        ]
+
+    def list_detections(self) -> list[dict]:
+        return list(self._data["detections"].values())
+
     def record_asset_state(self, asset_id: str, payload: dict) -> None:
         self._data["assets"][asset_id] = _serialise(payload)
         self._persist()

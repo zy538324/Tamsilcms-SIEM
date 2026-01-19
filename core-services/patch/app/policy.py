@@ -21,8 +21,18 @@ def evaluate_patches(policy: PatchPolicy, patches: list[PatchMetadata]) -> Eligi
     allowed_severities = set(policy.allowed_severities)
     deferred_categories = set(policy.deferred_categories)
     exclusions = set(policy.exclusions)
+    superseded = _collect_superseded_ids(patches)
 
     for patch in patches:
+        if patch.patch_id in superseded:
+            decisions.append(
+                EligibilityDecision(
+                    patch_id=patch.patch_id,
+                    status="deferred",
+                    reason="superseded",
+                )
+            )
+            continue
         if patch.patch_id in exclusions:
             decisions.append(
                 EligibilityDecision(
@@ -60,6 +70,13 @@ def evaluate_patches(policy: PatchPolicy, patches: list[PatchMetadata]) -> Eligi
         )
 
     return EligibilityResult(allowed=allowed, decisions=decisions)
+
+
+def _collect_superseded_ids(patches: list[PatchMetadata]) -> set[str]:
+    superseded: set[str] = set()
+    for patch in patches:
+        superseded.update(patch.supersedes)
+    return superseded
 
 
 def next_maintenance_window(
