@@ -14,10 +14,12 @@ This directory now includes a minimal FastAPI gateway that accepts mTLS-backed
 ### Key Endpoints
 - `GET /health`: health check for load balancers.
 - `POST /mtls/hello`: forwards signed hello payloads to identity.
+- `POST /mtls/events`: forwards signed event batches to ingestion.
 
 ### Environment Variables
 - `TRANSPORT_ENV`: runtime environment name.
 - `TRANSPORT_IDENTITY_URL`: base URL for the identity service.
+- `TRANSPORT_INGESTION_URL`: base URL for the ingestion service.
 - `TRANSPORT_REQUEST_TIMEOUT`: outbound request timeout in seconds.
 - `TRANSPORT_SERVICE_NAME`: service identifier for responses.
 - `TRANSPORT_TRUSTED_FINGERPRINTS`: comma-separated certificate fingerprints (optional allow list).
