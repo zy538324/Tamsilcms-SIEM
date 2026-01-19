@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 from pydantic import BaseModel, Field
 
@@ -89,15 +89,7 @@ class LocalGroupsInventory(InventoryBase):
     groups: list[LocalGroup]
 
 
-EventPayloadValue = Union[
-    str,
-    int,
-    float,
-    bool,
-    None,
-    List["EventPayloadValue"],
-    Dict[str, "EventPayloadValue"],
-]
+EventPayloadValue = Any  # use Any to avoid implicit recursive type aliases which Pydantic cannot resolve reliably
 
 
 class EventEnvelope(BaseModel):

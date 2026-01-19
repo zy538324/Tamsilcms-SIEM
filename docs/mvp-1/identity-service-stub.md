@@ -17,7 +17,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 IDENTITY_HMAC_SHARED_KEY="replace-me" \
 IDENTITY_SIGNATURE_TTL=120 \
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+uvicorn app.main:app --host 0.0.0.0 --port 8082
 ```
 
 ## Signature Format

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -205,15 +205,7 @@ class TelemetryAnomaly(BaseModel):
     created_at: datetime
 
 
-EventPayloadValue = Union[
-    str,
-    int,
-    float,
-    bool,
-    None,
-    List["EventPayloadValue"],
-    Dict[str, "EventPayloadValue"],
-]
+EventPayloadValue = Any  # free-form JSON-like payload values; avoid recursive type aliases
 
 
 class EventEnvelope(BaseModel):
