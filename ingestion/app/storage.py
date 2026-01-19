@@ -16,6 +16,7 @@ from .models import (
     EventBatch,
     EventClockDrift,
     EventGapReport,
+    EventIngestLogRecord,
     EventRecord,
     EventTimeline,
     HardwareInventory,
@@ -1964,6 +1965,62 @@ class InventoryStore:
                 drift_seconds=row["drift_seconds"],
                 timestamp_local=row["timestamp_local"],
                 timestamp_received=row["timestamp_received"],
+            )
+            for row in rows
+        ]
+
+    async def list_event_ingest_logs(
+        self,
+        tenant_id: Optional[str],
+        asset_id: Optional[str],
+        limit: int,
+        since: Optional[datetime],
+    ) -> list["EventIngestLogRecord"]:
+        conditions = ["1=1"]
+        params: list[object] = []
+        if tenant_id:
+            params.append(tenant_id)
+            conditions.append(f"tenant_id = ${len(params)}")
+        if asset_id:
+            params.append(asset_id)
+            conditions.append(f"asset_id = ${len(params)}")
+        if since:
+            params.append(since)
+            conditions.append(f"received_at >= ${len(params)}")
+        params.append(limit)
+        query = f"""
+            SELECT payload_id,
+                   tenant_id,
+                   asset_id,
+                   status,
+                   received_at,
+                   processed_at,
+                   event_count,
+                   accepted_count,
+                   rejected_count,
+                   reject_reason,
+                   signature_verified,
+                   schema_version
+            FROM event_ingest_log
+            WHERE {" AND ".join(conditions)}
+            ORDER BY received_at DESC
+            LIMIT ${len(params)}
+        """
+        rows = await self.pool.fetch(query, *params)
+        return [
+            EventIngestLogRecord(
+                payload_id=row["payload_id"],
+                tenant_id=row["tenant_id"],
+                asset_id=row["asset_id"],
+                status=row["status"],
+                received_at=row["received_at"],
+                processed_at=row["processed_at"],
+                event_count=row["event_count"],
+                accepted_count=row["accepted_count"],
+                rejected_count=row["rejected_count"],
+                reject_reason=row["reject_reason"],
+                signature_verified=row["signature_verified"],
+                schema_version=row["schema_version"],
             )
             for row in rows
         ]

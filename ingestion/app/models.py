@@ -262,6 +262,21 @@ class EventIngestResponse(BaseModel):
     drifts: List[EventClockDrift]
 
 
+class EventIngestLogRecord(BaseModel):
+    payload_id: UUID
+    tenant_id: str
+    asset_id: str
+    status: str
+    received_at: datetime
+    processed_at: Optional[datetime] = None
+    event_count: int
+    accepted_count: int
+    rejected_count: int
+    reject_reason: Optional[str] = None
+    signature_verified: bool
+    schema_version: str
+
+
 class EventRecord(BaseModel):
     event_id: UUID
     tenant_id: str

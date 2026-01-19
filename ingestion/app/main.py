@@ -44,6 +44,7 @@ from .models import (
     EventClockDrift,
     EventGapReport,
     EventIngestResponse,
+    EventIngestLogRecord,
     EventRecord,
     EventTimeline,
 )
@@ -530,6 +531,23 @@ async def list_event_drifts(
     _: None = Depends(enforce_https),
 ) -> list[EventClockDrift]:
     return await store.list_event_drifts(asset_id=asset_id, limit=limit)
+
+
+@app.get("/events/ingest-log", response_model=list[EventIngestLogRecord])
+async def list_event_ingest_logs(
+    tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    asset_id: str | None = Query(default=None, min_length=8, max_length=64),
+    limit: int = Query(default=200, ge=1, le=1000),
+    since: datetime | None = Query(default=None),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[EventIngestLogRecord]:
+    return await store.list_event_ingest_logs(
+        tenant_id=tenant_id,
+        asset_id=asset_id,
+        limit=limit,
+        since=since,
+    )
 
 
 @app.get("/events/assets/{asset_id}/export.csv", response_class=Response)

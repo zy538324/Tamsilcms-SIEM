@@ -32,6 +32,7 @@ Endpoints:
 - `GET /events/assets/{asset_id}/timeline`
 - `GET /events/assets/{asset_id}/gaps`
 - `GET /events/assets/{asset_id}/clock-drifts`
+- `GET /events/ingest-log`
 - `GET /events/assets/{asset_id}/export.csv`
 
 Headers (required for `POST /events`):
