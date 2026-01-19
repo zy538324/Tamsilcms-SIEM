@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -13,6 +13,12 @@ from .models import (
     AssetRecord,
     AssetStateResponse,
     AssetInventoryStats,
+    EventBatch,
+    EventClockDrift,
+    EventGapReport,
+    EventIngestLogRecord,
+    EventRecord,
+    EventTimeline,
     HardwareInventory,
     InventorySnapshot,
     LocalGroup,
@@ -31,6 +37,7 @@ from .models import (
     TelemetryAnomaly,
 )
 from .telemetry import metric_description, metric_unit
+from .events import canonical_payload_hash, ensure_timestamp_bounds, EventValidationError
 
 
 def _parse_date(value: Optional[str]) -> Optional[date]:
@@ -78,6 +85,47 @@ class InventoryStore:
         await self._ensure_tenant(tenant_id)
         resolved_hostname = hostname or asset_id
         await self.pool.execute(
+            """
+            INSERT INTO assets (
+                asset_id,
+                tenant_id,
+                hostname,
+                asset_type,
+                last_seen_at
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (asset_id) DO UPDATE
+            SET hostname = EXCLUDED.hostname,
+                updated_at = NOW(),
+                last_seen_at = EXCLUDED.last_seen_at
+            """,
+            asset_id,
+            tenant_id,
+            resolved_hostname,
+            "unknown",
+            collected_at,
+        )
+
+    async def _ensure_asset_with_connection(
+        self,
+        connection: asyncpg.Connection,
+        tenant_id: str,
+        asset_id: str,
+        hostname: Optional[str],
+        collected_at: datetime,
+    ) -> None:
+        await connection.execute(
+            """
+            INSERT INTO tenants (tenant_id, name, slug)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (tenant_id) DO NOTHING
+            """,
+            tenant_id,
+            f"tenant-{tenant_id}",
+            f"tenant-{tenant_id}",
+        )
+        resolved_hostname = hostname or asset_id
+        await connection.execute(
             """
             INSERT INTO assets (
                 asset_id,
@@ -1400,3 +1448,583 @@ class InventoryStore:
                 deviation,
                 "open",
             )
+
+    async def record_event_batch_log(
+        self,
+        payload_id: UUID,
+        tenant_id: str,
+        asset_id: str,
+        status: str,
+        signature: str | None,
+        signature_verified: bool,
+        event_count: int,
+        accepted_count: int,
+        rejected_count: int,
+        reject_reason: str | None,
+        schema_version: str,
+    ) -> None:
+        await self.pool.execute(
+            """
+            INSERT INTO event_ingest_log (
+                payload_id,
+                tenant_id,
+                asset_id,
+                status,
+                received_at,
+                processed_at,
+                event_count,
+                accepted_count,
+                rejected_count,
+                reject_reason,
+                signature,
+                signature_verified,
+                schema_version
+            )
+            VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT (payload_id) DO UPDATE
+            SET status = EXCLUDED.status,
+                processed_at = EXCLUDED.processed_at,
+                event_count = EXCLUDED.event_count,
+                accepted_count = EXCLUDED.accepted_count,
+                rejected_count = EXCLUDED.rejected_count,
+                reject_reason = EXCLUDED.reject_reason,
+                signature = EXCLUDED.signature,
+                signature_verified = EXCLUDED.signature_verified,
+                schema_version = EXCLUDED.schema_version
+            """,
+            payload_id,
+            tenant_id,
+            asset_id,
+            status,
+            event_count,
+            accepted_count,
+            rejected_count,
+            reject_reason,
+            signature,
+            signature_verified,
+            schema_version,
+        )
+
+    async def event_payload_exists(self, payload_id: UUID) -> bool:
+        existing = await self.pool.fetchval(
+            "SELECT 1 FROM event_ingest_log WHERE payload_id = $1",
+            payload_id,
+        )
+        return existing is not None
+
+    async def ingest_event_batch(
+        self,
+        batch: EventBatch,
+        signature: str | None,
+        signature_verified: bool,
+        event_stale_seconds: int,
+        event_future_seconds: int,
+        clock_drift_seconds: int,
+    ) -> tuple[list[EventGapReport], list[EventClockDrift], int, int]:
+        received_at = datetime.now(timezone.utc)
+        accepted = 0
+        rejected = 0
+        gap_reports: list[EventGapReport] = []
+        drift_reports: list[EventClockDrift] = []
+        trust_level = "verified" if signature_verified else "unverified"
+
+        await self.record_event_batch_log(
+            payload_id=batch.payload_id,
+            tenant_id=batch.tenant_id,
+            asset_id=batch.asset_id,
+            status="processing",
+            signature=signature,
+            signature_verified=signature_verified,
+            event_count=len(batch.events),
+            accepted_count=0,
+            rejected_count=0,
+            reject_reason=None,
+            schema_version=batch.schema_version,
+        )
+
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                await self._ensure_asset_with_connection(
+                    connection=connection,
+                    tenant_id=batch.tenant_id,
+                    asset_id=batch.asset_id,
+                    hostname=None,
+                    collected_at=received_at,
+                )
+                for event in batch.events:
+                    reject_reason = None
+                    try:
+                        ensure_timestamp_bounds(
+                            event=event,
+                            now=received_at,
+                            stale_seconds=event_stale_seconds,
+                            future_seconds=event_future_seconds,
+                        )
+                        if canonical_payload_hash(event.payload) != event.payload_hash:
+                            reject_reason = "payload_hash_mismatch"
+                    except EventValidationError as exc:
+                        reject_reason = exc.reason
+                    if reject_reason:
+                        rejected += 1
+                        await connection.execute(
+                            """
+                            INSERT INTO event_rejections (
+                                event_id,
+                                payload_id,
+                                tenant_id,
+                                asset_id,
+                                reason,
+                                detected_at
+                            )
+                            VALUES ($1, $2, $3, $4, $5, NOW())
+                            """,
+                            event.event_id,
+                            batch.payload_id,
+                            batch.tenant_id,
+                            batch.asset_id,
+                            reject_reason,
+                        )
+                        continue
+
+                    event_time = event.timestamp_local
+                    if event_time.tzinfo is None:
+                        event_time = event_time.replace(tzinfo=timezone.utc)
+
+                    last_sequence = await connection.fetchval(
+                        """
+                        SELECT last_sequence
+                        FROM event_sequence_state
+                        WHERE asset_id = $1 AND source_module = $2
+                        FOR UPDATE
+                        """,
+                        batch.asset_id,
+                        event.source_module,
+                    )
+                    if last_sequence is not None and event.sequence_number <= last_sequence:
+                        rejected += 1
+                        await connection.execute(
+                            """
+                            INSERT INTO event_rejections (
+                                event_id,
+                                payload_id,
+                                tenant_id,
+                                asset_id,
+                                reason,
+                                detected_at
+                            )
+                            VALUES ($1, $2, $3, $4, $5, NOW())
+                            """,
+                            event.event_id,
+                            batch.payload_id,
+                            batch.tenant_id,
+                            batch.asset_id,
+                            "sequence_replay",
+                        )
+                        continue
+                    if last_sequence is not None and event.sequence_number > last_sequence + 1:
+                        missing_from = last_sequence + 1
+                        missing_to = event.sequence_number - 1
+                        await connection.execute(
+                            """
+                            INSERT INTO event_gap_reports (
+                                asset_id,
+                                source_module,
+                                missing_from,
+                                missing_to,
+                                detected_at
+                            )
+                            VALUES ($1, $2, $3, $4, NOW())
+                            """,
+                            batch.asset_id,
+                            event.source_module,
+                            missing_from,
+                            missing_to,
+                        )
+                        gap_reports.append(
+                            EventGapReport(
+                                asset_id=batch.asset_id,
+                                source_module=event.source_module,
+                                missing_from=missing_from,
+                                missing_to=missing_to,
+                                detected_at=received_at,
+                            )
+                        )
+
+                    inserted = await connection.fetchval(
+                        """
+                        INSERT INTO event_ledger (
+                            event_id,
+                            tenant_id,
+                            asset_id,
+                            event_type,
+                            event_category,
+                            source_module,
+                            trust_level,
+                            severity,
+                            sequence_number,
+                            timestamp_local,
+                            timestamp_received,
+                            payload,
+                            payload_hash
+                        )
+                        VALUES (
+                            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+                        )
+                        ON CONFLICT (event_id) DO NOTHING
+                        RETURNING event_id
+                        """,
+                        event.event_id,
+                        batch.tenant_id,
+                        batch.asset_id,
+                        event.event_type,
+                        event.event_category,
+                        event.source_module,
+                        trust_level,
+                        event.severity,
+                        event.sequence_number,
+                        event_time,
+                        received_at,
+                        event.payload,
+                        event.payload_hash,
+                    )
+                    if not inserted:
+                        rejected += 1
+                        await connection.execute(
+                            """
+                            INSERT INTO event_rejections (
+                                event_id,
+                                payload_id,
+                                tenant_id,
+                                asset_id,
+                                reason,
+                                detected_at
+                            )
+                            VALUES ($1, $2, $3, $4, $5, NOW())
+                            """,
+                            event.event_id,
+                            batch.payload_id,
+                            batch.tenant_id,
+                            batch.asset_id,
+                            "event_replay",
+                        )
+                        continue
+
+                    await connection.execute(
+                        """
+                        INSERT INTO event_sequence_state (
+                            asset_id,
+                            source_module,
+                            last_sequence,
+                            updated_at
+                        )
+                        VALUES ($1, $2, $3, NOW())
+                        ON CONFLICT (asset_id, source_module) DO UPDATE
+                        SET last_sequence = EXCLUDED.last_sequence,
+                            updated_at = NOW()
+                        """,
+                        batch.asset_id,
+                        event.source_module,
+                        event.sequence_number,
+                    )
+
+                    drift_seconds = int(abs((received_at - event_time).total_seconds()))
+                    if drift_seconds > clock_drift_seconds:
+                        await connection.execute(
+                            """
+                            INSERT INTO event_clock_drifts (
+                                event_id,
+                                asset_id,
+                                source_module,
+                                drift_seconds,
+                                timestamp_local,
+                                timestamp_received,
+                                detected_at
+                            )
+                            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                            """,
+                            event.event_id,
+                            batch.asset_id,
+                            event.source_module,
+                            drift_seconds,
+                            event_time,
+                            received_at,
+                        )
+                        drift_reports.append(
+                            EventClockDrift(
+                                event_id=event.event_id,
+                                asset_id=batch.asset_id,
+                                source_module=event.source_module,
+                                drift_seconds=drift_seconds,
+                                timestamp_local=event_time,
+                                timestamp_received=received_at,
+                            )
+                        )
+
+                    accepted += 1
+
+        status = "accepted" if rejected == 0 else "partial"
+        await self.record_event_batch_log(
+            payload_id=batch.payload_id,
+            tenant_id=batch.tenant_id,
+            asset_id=batch.asset_id,
+            status=status,
+            signature=signature,
+            signature_verified=signature_verified,
+            event_count=len(batch.events),
+            accepted_count=accepted,
+            rejected_count=rejected,
+            reject_reason=None,
+            schema_version=batch.schema_version,
+        )
+        return gap_reports, drift_reports, accepted, rejected
+
+    async def list_recent_events(
+        self,
+        tenant_id: Optional[str],
+        limit: int,
+        since: Optional[datetime],
+        event_category: Optional[str],
+        event_type: Optional[str],
+    ) -> list[EventRecord]:
+        conditions = ["1=1"]
+        params: list[object] = []
+        if tenant_id:
+            params.append(tenant_id)
+            conditions.append(f"tenant_id = ${len(params)}")
+        if since:
+            params.append(since)
+            conditions.append(f"timestamp_received >= ${len(params)}")
+        if event_category:
+            params.append(event_category)
+            conditions.append(f"event_category = ${len(params)}")
+        if event_type:
+            params.append(event_type)
+            conditions.append(f"event_type = ${len(params)}")
+        params.append(limit)
+        query = f"""
+            SELECT event_id, tenant_id, asset_id, event_type, event_category,
+                   source_module, trust_level, severity, sequence_number,
+                   timestamp_local, timestamp_received, payload, payload_hash
+            FROM event_ledger
+            WHERE {" AND ".join(conditions)}
+            ORDER BY timestamp_received DESC
+            LIMIT ${len(params)}
+        """
+        rows = await self.pool.fetch(query, *params)
+        return [
+            EventRecord(
+                event_id=row["event_id"],
+                tenant_id=row["tenant_id"],
+                asset_id=row["asset_id"],
+                event_type=row["event_type"],
+                event_category=row["event_category"],
+                source_module=row["source_module"],
+                trust_level=row["trust_level"],
+                severity=row["severity"],
+                sequence_number=row["sequence_number"],
+                timestamp_local=row["timestamp_local"],
+                timestamp_received=row["timestamp_received"],
+                payload=row["payload"],
+                payload_hash=row["payload_hash"],
+            )
+            for row in rows
+        ]
+
+    async def get_event(self, event_id: UUID) -> Optional[EventRecord]:
+        row = await self.pool.fetchrow(
+            """
+            SELECT event_id, tenant_id, asset_id, event_type, event_category,
+                   source_module, trust_level, severity, sequence_number,
+                   timestamp_local, timestamp_received, payload, payload_hash
+            FROM event_ledger
+            WHERE event_id = $1
+            """,
+            event_id,
+        )
+        if not row:
+            return None
+        return EventRecord(
+            event_id=row["event_id"],
+            tenant_id=row["tenant_id"],
+            asset_id=row["asset_id"],
+            event_type=row["event_type"],
+            event_category=row["event_category"],
+            source_module=row["source_module"],
+            trust_level=row["trust_level"],
+            severity=row["severity"],
+            sequence_number=row["sequence_number"],
+            timestamp_local=row["timestamp_local"],
+            timestamp_received=row["timestamp_received"],
+            payload=row["payload"],
+            payload_hash=row["payload_hash"],
+        )
+
+    async def get_asset_timeline(
+        self,
+        asset_id: str,
+        limit: int,
+        since: Optional[datetime],
+        until: Optional[datetime],
+        event_category: Optional[str],
+        event_type: Optional[str],
+    ) -> EventTimeline:
+        conditions = ["asset_id = $1"]
+        params: list[object] = [asset_id]
+        if since:
+            params.append(since)
+            conditions.append(f"timestamp_received >= ${len(params)}")
+        if until:
+            params.append(until)
+            conditions.append(f"timestamp_received <= ${len(params)}")
+        if event_category:
+            params.append(event_category)
+            conditions.append(f"event_category = ${len(params)}")
+        if event_type:
+            params.append(event_type)
+            conditions.append(f"event_type = ${len(params)}")
+        params.append(limit)
+        query = f"""
+            SELECT event_id, tenant_id, asset_id, event_type, event_category,
+                   source_module, trust_level, severity, sequence_number,
+                   timestamp_local, timestamp_received, payload, payload_hash
+            FROM event_ledger
+            WHERE {" AND ".join(conditions)}
+            ORDER BY timestamp_received DESC
+            LIMIT ${len(params)}
+        """
+        rows = await self.pool.fetch(query, *params)
+        events = [
+            EventRecord(
+                event_id=row["event_id"],
+                tenant_id=row["tenant_id"],
+                asset_id=row["asset_id"],
+                event_type=row["event_type"],
+                event_category=row["event_category"],
+                source_module=row["source_module"],
+                trust_level=row["trust_level"],
+                severity=row["severity"],
+                sequence_number=row["sequence_number"],
+                timestamp_local=row["timestamp_local"],
+                timestamp_received=row["timestamp_received"],
+                payload=row["payload"],
+                payload_hash=row["payload_hash"],
+            )
+            for row in rows
+        ]
+        return EventTimeline(asset_id=asset_id, events=events)
+
+    async def list_event_gaps(
+        self,
+        asset_id: str,
+        limit: int,
+    ) -> list[EventGapReport]:
+        rows = await self.pool.fetch(
+            """
+            SELECT asset_id, source_module, missing_from, missing_to, detected_at
+            FROM event_gap_reports
+            WHERE asset_id = $1
+            ORDER BY detected_at DESC
+            LIMIT $2
+            """,
+            asset_id,
+            limit,
+        )
+        return [
+            EventGapReport(
+                asset_id=row["asset_id"],
+                source_module=row["source_module"],
+                missing_from=row["missing_from"],
+                missing_to=row["missing_to"],
+                detected_at=row["detected_at"],
+            )
+            for row in rows
+        ]
+
+    async def list_event_drifts(
+        self,
+        asset_id: str,
+        limit: int,
+    ) -> list[EventClockDrift]:
+        rows = await self.pool.fetch(
+            """
+            SELECT event_id, asset_id, source_module, drift_seconds,
+                   timestamp_local, timestamp_received
+            FROM event_clock_drifts
+            WHERE asset_id = $1
+            ORDER BY detected_at DESC
+            LIMIT $2
+            """,
+            asset_id,
+            limit,
+        )
+        return [
+            EventClockDrift(
+                event_id=row["event_id"],
+                asset_id=row["asset_id"],
+                source_module=row["source_module"],
+                drift_seconds=row["drift_seconds"],
+                timestamp_local=row["timestamp_local"],
+                timestamp_received=row["timestamp_received"],
+            )
+            for row in rows
+        ]
+
+    async def list_event_ingest_logs(
+        self,
+        tenant_id: Optional[str],
+        asset_id: Optional[str],
+        status: Optional[str],
+        limit: int,
+        since: Optional[datetime],
+    ) -> list["EventIngestLogRecord"]:
+        conditions = ["1=1"]
+        params: list[object] = []
+        if tenant_id:
+            params.append(tenant_id)
+            conditions.append(f"tenant_id = ${len(params)}")
+        if asset_id:
+            params.append(asset_id)
+            conditions.append(f"asset_id = ${len(params)}")
+        if status:
+            params.append(status)
+            conditions.append(f"status = ${len(params)}")
+        if since:
+            params.append(since)
+            conditions.append(f"received_at >= ${len(params)}")
+        params.append(limit)
+        query = f"""
+            SELECT payload_id,
+                   tenant_id,
+                   asset_id,
+                   status,
+                   received_at,
+                   processed_at,
+                   event_count,
+                   accepted_count,
+                   rejected_count,
+                   reject_reason,
+                   signature_verified,
+                   schema_version
+            FROM event_ingest_log
+            WHERE {" AND ".join(conditions)}
+            ORDER BY received_at DESC
+            LIMIT ${len(params)}
+        """
+        rows = await self.pool.fetch(query, *params)
+        return [
+            EventIngestLogRecord(
+                payload_id=row["payload_id"],
+                tenant_id=row["tenant_id"],
+                asset_id=row["asset_id"],
+                status=row["status"],
+                received_at=row["received_at"],
+                processed_at=row["processed_at"],
+                event_count=row["event_count"],
+                accepted_count=row["accepted_count"],
+                rejected_count=row["rejected_count"],
+                reject_reason=row["reject_reason"],
+                signature_verified=row["signature_verified"],
+                schema_version=row["schema_version"],
+            )
+            for row in rows
+        ]

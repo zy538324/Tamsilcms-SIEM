@@ -17,6 +17,12 @@ class Settings:
     telemetry_future_seconds: int
     telemetry_baseline_window: int
     telemetry_anomaly_stddev_threshold: float
+    event_batch_limit: int
+    event_stale_seconds: int
+    event_future_seconds: int
+    event_clock_drift_seconds: int
+    signature_ttl_seconds: int
+    hmac_shared_key: str
 
 
 def load_settings() -> Settings:
@@ -36,4 +42,12 @@ def load_settings() -> Settings:
         telemetry_anomaly_stddev_threshold=float(
             os.environ.get("INGESTION_TELEMETRY_ANOMALY_THRESHOLD", "3.0")
         ),
+        event_batch_limit=int(os.environ.get("INGESTION_EVENT_BATCH_LIMIT", "200")),
+        event_stale_seconds=int(os.environ.get("INGESTION_EVENT_STALE_SECONDS", "900")),
+        event_future_seconds=int(os.environ.get("INGESTION_EVENT_FUTURE_SECONDS", "120")),
+        event_clock_drift_seconds=int(
+            os.environ.get("INGESTION_EVENT_CLOCK_DRIFT_SECONDS", "300")
+        ),
+        signature_ttl_seconds=int(os.environ.get("INGESTION_SIGNATURE_TTL", "120")),
+        hmac_shared_key=os.environ.get("INGESTION_HMAC_SHARED_KEY", ""),
     )
