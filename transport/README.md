@@ -19,6 +19,7 @@ This directory now includes a minimal FastAPI gateway that accepts mTLS-backed
 ### Environment Variables
 - `TRANSPORT_ENV`: runtime environment name.
 - `TRANSPORT_IDENTITY_URL`: base URL for the identity service.
+- `TRANSPORT_INGESTION_URL`: base URL for the ingestion service.
 - `TRANSPORT_REQUEST_TIMEOUT`: outbound request timeout in seconds.
 - `TRANSPORT_SERVICE_NAME`: service identifier for responses.
 - `TRANSPORT_TRUSTED_FINGERPRINTS`: comma-separated certificate fingerprints (optional allow list).

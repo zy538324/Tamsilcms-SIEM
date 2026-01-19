@@ -33,3 +33,7 @@ Endpoints:
 - `GET /events/assets/{asset_id}/gaps`
 - `GET /events/assets/{asset_id}/clock-drifts`
 - `GET /events/assets/{asset_id}/export.csv`
+
+Headers (required for `POST /events`):
+- `X-Request-Signature`
+- `X-Request-Timestamp`
