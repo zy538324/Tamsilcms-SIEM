@@ -240,6 +240,12 @@ async def create_task(
 
     _validate_allowlist(settings, payload.command_payload)
 
+    if payload.expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="expiry_in_past",
+        )
+
     task = Task(
         task_id=payload.task_id,
         tenant_id=payload.tenant_id,
@@ -252,7 +258,13 @@ async def create_task(
         expires_at=payload.expires_at,
         signature=signature,
     )
-    task_store.create(task)
+    try:
+        task_store.create(task)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
     return TaskCreateResponse(
         status="created",
@@ -368,6 +380,19 @@ async def record_task_result(
         duration_ms=payload.duration_ms,
         truncated=payload.truncated,
     )
+    task = task_store.get(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="task_not_found",
+        )
+
+    if task.tenant_id != payload.tenant_id or task.asset_id != payload.asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="task_scope_mismatch",
+        )
+
     task = task_store.record_result(result)
     if not task:
         raise HTTPException(

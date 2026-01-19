@@ -59,6 +59,8 @@ class TaskStore:
         self._results: Dict[str, TaskResult] = {}
 
     def create(self, task: Task) -> Task:
+        if task.task_id in self._tasks:
+            raise ValueError("task_exists")
         self._tasks[task.task_id] = task
         return task
 
