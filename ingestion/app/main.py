@@ -51,6 +51,21 @@ def get_store() -> InventoryStore:
     return store
 
 
+def validate_sample_timestamps(
+    payload: TelemetryPayload,
+    now: datetime,
+    stale_seconds: int,
+    future_seconds: int,
+) -> None:
+    oldest_allowed = now - timedelta(seconds=stale_seconds)
+    newest_allowed = now + timedelta(seconds=future_seconds)
+    for sample in payload.samples:
+        if sample.observed_at < oldest_allowed:
+            raise TelemetryValidationError("sample_stale")
+        if sample.observed_at > newest_allowed:
+            raise TelemetryValidationError("sample_in_future")
+
+
 async def enforce_https(request: Request) -> None:
     forwarded_proto = request.headers.get("x-forwarded-proto", "http")
     if forwarded_proto.lower() != "https":
@@ -140,6 +155,12 @@ async def ingest_telemetry(
             detail="payload_in_future",
         )
     try:
+        validate_sample_timestamps(
+            payload=payload,
+            now=now,
+            stale_seconds=settings.telemetry_stale_seconds,
+            future_seconds=settings.telemetry_future_seconds,
+        )
         samples = normalise_samples(payload.samples)
     except TelemetryValidationError as exc:
         await store.record_telemetry_rejection(
@@ -169,6 +190,17 @@ async def ingest_telemetry(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="payload_replay",
+        ) from exc
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        await store.record_telemetry_rejection(
+            payload_id=payload.payload_id,
+            tenant_id=payload.tenant_id,
+            asset_id=payload.asset_id,
+            reason="ingest_failed",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ingest_failed",
         ) from exc
     return TelemetryIngestResponse(
         status="accepted",
