@@ -193,6 +193,18 @@ class AssetBlockResponse(BaseModel):
     asset_state: AssetPatchState
 
 
+class AssetUnblockRequest(BaseModel):
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    asset_id: str = Field(..., min_length=3, max_length=64)
+    reason: str = Field(..., min_length=5, max_length=200)
+    recorded_at: datetime
+
+
+class AssetUnblockResponse(BaseModel):
+    status: Literal["unblocked"]
+    asset_state: AssetPatchState
+
+
 class ComplianceSummary(BaseModel):
     tenant_id: str = Field(..., min_length=3, max_length=64)
     compliant: int
@@ -206,6 +218,11 @@ class AssetHistoryRecord(BaseModel):
     recorded_at: datetime
     verification_status: VerificationStatus
     reboot_confirmed: bool
+
+
+class NextWindowResponse(BaseModel):
+    policy_id: UUID
+    next_window_start: Optional[datetime] = None
 
 
 class EvidenceRecord(BaseModel):

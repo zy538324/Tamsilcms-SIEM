@@ -15,6 +15,8 @@ from .models import (
     AssetBlockResponse,
     AssetPatchState,
     AssetHistoryRecord,
+    AssetUnblockRequest,
+    AssetUnblockResponse,
     ComplianceSummary,
     DetectionBatch,
     DetectionResponse,
@@ -27,8 +29,9 @@ from .models import (
     PatchPolicy,
     PolicyResponse,
     TaskManifest,
+    NextWindowResponse,
 )
-from .policy import evaluate_patches
+from .policy import evaluate_patches, next_maintenance_window
 from .scheduler import build_execution_plan
 from .store import PatchStore, build_store
 from .tasks import build_task_manifest
@@ -423,6 +426,25 @@ async def block_asset(
     return AssetBlockResponse(status="blocked", asset_state=asset_state)
 
 
+@app.post("/assets/unblock", response_model=AssetUnblockResponse)
+async def unblock_asset(
+    payload: AssetUnblockRequest,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> AssetUnblockResponse:
+    """Restore an asset to a normal patching state."""
+    asset_state = AssetPatchState(
+        tenant_id=payload.tenant_id,
+        asset_id=payload.asset_id,
+        status="normal",
+        reason=payload.reason,
+        recorded_at=payload.recorded_at,
+    )
+    store.record_asset_state(payload.asset_id, asset_state.model_dump())
+    return AssetUnblockResponse(status="unblocked", asset_state=asset_state)
+
+
 @app.get("/assets/{asset_id}/state", response_model=AssetPatchState)
 async def get_asset_state(
     asset_id: str,
@@ -471,6 +493,28 @@ async def get_compliance_summary(
 ) -> ComplianceSummary:
     """Return a compliance summary for a tenant."""
     return _compute_compliance_summary(tenant_id, store)
+
+
+@app.get("/policies/{policy_id}/next-window", response_model=NextWindowResponse)
+async def get_next_window(
+    policy_id: UUID,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> NextWindowResponse:
+    """Return the next maintenance window for a policy."""
+    stored = store.get_policy(policy_id)
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="policy_not_found",
+        )
+    policy = PatchPolicy.model_validate(stored)
+    now = datetime.now(timezone.utc)
+    return NextWindowResponse(
+        policy_id=policy_id,
+        next_window_start=next_maintenance_window(now, policy.maintenance_windows),
+    )
 
 
 @app.get("/plans/{plan_id}/tasks", response_model=TaskManifest)
