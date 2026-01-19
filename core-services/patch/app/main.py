@@ -28,6 +28,8 @@ from .models import (
     ExecutionResultResponse,
     PlanCheckRequest,
     PlanCheckResponse,
+    PlanRollbackRequest,
+    PlanRollbackResponse,
     PlanStartRequest,
     PlanStartResponse,
     PatchPolicy,
@@ -352,6 +354,32 @@ async def record_plan_checks(
         plan.post_check_results.extend(payload.checks)
     store.update_plan(plan)
     return PlanCheckResponse(status="recorded", plan_id=plan_id)
+
+
+@app.post("/plans/{plan_id}/rollback", response_model=PlanRollbackResponse)
+async def record_plan_rollback(
+    plan_id: UUID,
+    payload: PlanRollbackRequest,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> PlanRollbackResponse:
+    """Record rollback actions executed for a plan."""
+    plan_data = store.get_plan(plan_id)
+    if not plan_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="plan_not_found",
+        )
+    plan = ExecutionPlan.model_validate(plan_data)
+    if plan.tenant_id != payload.tenant_id or plan.asset_id != payload.asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="plan_scope_mismatch",
+        )
+    plan.rollback_actions.extend(payload.actions)
+    store.update_plan(plan)
+    return PlanRollbackResponse(status="recorded", plan_id=plan_id)
 
 
 @app.get("/plans/{plan_id}", response_model=ExecutionPlan)

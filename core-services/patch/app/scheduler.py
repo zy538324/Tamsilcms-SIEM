@@ -42,6 +42,7 @@ def build_execution_plan(
         eligibility=eligibility.decisions,
         pre_check_results=[],
         post_check_results=[],
+        rollback_actions=[],
     )
 
 

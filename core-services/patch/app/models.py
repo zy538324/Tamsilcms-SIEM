@@ -118,6 +118,7 @@ class ExecutionPlan(BaseModel):
     eligibility: list[EligibilityDecision]
     pre_check_results: list[str] = Field(default_factory=list)
     post_check_results: list[str] = Field(default_factory=list)
+    rollback_actions: list[str] = Field(default_factory=list)
 
 
 class ExecutionPlanResponse(BaseModel):
@@ -146,6 +147,18 @@ class PlanCheckRequest(BaseModel):
 
 
 class PlanCheckResponse(BaseModel):
+    status: Literal["recorded"]
+    plan_id: UUID
+
+
+class PlanRollbackRequest(BaseModel):
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    asset_id: str = Field(..., min_length=3, max_length=64)
+    actions: list[str] = Field(..., min_length=1)
+    recorded_at: datetime
+
+
+class PlanRollbackResponse(BaseModel):
     status: Literal["recorded"]
     plan_id: UUID
 
