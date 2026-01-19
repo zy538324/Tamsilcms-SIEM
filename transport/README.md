@@ -14,6 +14,7 @@ This directory now includes a minimal FastAPI gateway that accepts mTLS-backed
 ### Key Endpoints
 - `GET /health`: health check for load balancers.
 - `POST /mtls/hello`: forwards signed hello payloads to identity.
+- `POST /mtls/events`: forwards signed event batches to ingestion.
 
 ### Environment Variables
 - `TRANSPORT_ENV`: runtime environment name.
