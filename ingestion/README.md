@@ -35,6 +35,12 @@ Endpoints:
 - `GET /events/ingest-log`
 - `GET /events/assets/{asset_id}/export.csv`
 
+Query filters (optional for `GET /events/ingest-log`):
+- `tenant_id`
+- `asset_id`
+- `status`
+- `since`
+
 Headers (required for `POST /events`):
 - `X-Request-Signature`
 - `X-Request-Timestamp`

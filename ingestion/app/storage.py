@@ -1973,6 +1973,7 @@ class InventoryStore:
         self,
         tenant_id: Optional[str],
         asset_id: Optional[str],
+        status: Optional[str],
         limit: int,
         since: Optional[datetime],
     ) -> list["EventIngestLogRecord"]:
@@ -1984,6 +1985,9 @@ class InventoryStore:
         if asset_id:
             params.append(asset_id)
             conditions.append(f"asset_id = ${len(params)}")
+        if status:
+            params.append(status)
+            conditions.append(f"status = ${len(params)}")
         if since:
             params.append(since)
             conditions.append(f"received_at >= ${len(params)}")

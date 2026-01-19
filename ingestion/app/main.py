@@ -537,6 +537,7 @@ async def list_event_drifts(
 async def list_event_ingest_logs(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
     asset_id: str | None = Query(default=None, min_length=8, max_length=64),
+    status: str | None = Query(default=None, min_length=3, max_length=16),
     limit: int = Query(default=200, ge=1, le=1000),
     since: datetime | None = Query(default=None),
     store: InventoryStore = Depends(get_store),
@@ -545,6 +546,7 @@ async def list_event_ingest_logs(
     return await store.list_event_ingest_logs(
         tenant_id=tenant_id,
         asset_id=asset_id,
+        status=status,
         limit=limit,
         since=since,
     )
