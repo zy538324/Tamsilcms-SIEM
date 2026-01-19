@@ -1,9 +1,10 @@
-"""PostgreSQL-backed storage for MVP-3 inventory ingestion."""
+"""PostgreSQL-backed storage for MVP-3 inventory and MVP-4 telemetry ingestion."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import List, Optional
+from uuid import UUID
 
 import asyncpg
 
@@ -21,7 +22,13 @@ from .models import (
     OsInventory,
     SoftwareInventory,
     SoftwareItem,
+    TelemetryMetricSummary,
+    TelemetryPayload,
+    TelemetryPoint,
+    TelemetrySample,
+    TelemetrySeries,
 )
+from .telemetry import metric_description, metric_unit
 
 
 def _parse_date(value: Optional[str]) -> Optional[date]:
@@ -35,6 +42,10 @@ def _parse_date(value: Optional[str]) -> Optional[date]:
 
 def _to_iso_date(value: Optional[date]) -> Optional[str]:
     return value.isoformat() if value else None
+
+
+class TelemetryReplayError(RuntimeError):
+    """Raised when a telemetry payload is replayed."""
 
 
 @dataclass
@@ -290,6 +301,147 @@ class InventoryStore:
                             group_id,
                             member,
                         )
+
+    async def ingest_telemetry(
+        self,
+        payload: TelemetryPayload,
+        samples: List[TelemetrySample],
+        baseline_window: int,
+        anomaly_threshold: float,
+    ) -> None:
+        await self._ensure_asset(
+            payload.tenant_id,
+            payload.asset_id,
+            payload.hostname,
+            payload.collected_at,
+        )
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                await self._record_telemetry_receipt(
+                    connection,
+                    payload_id=payload.payload_id,
+                    tenant_id=payload.tenant_id,
+                    asset_id=payload.asset_id,
+                )
+                for sample in samples:
+                    metric_id = await self._ensure_metric(
+                        connection,
+                        name=sample.name,
+                        unit=sample.unit or metric_unit(sample.name),
+                    )
+                    await connection.execute(
+                        """
+                        INSERT INTO telemetry_samples (
+                            asset_id,
+                            metric_id,
+                            value,
+                            observed_at,
+                            collected_at
+                        )
+                        VALUES ($1, $2, $3, $4, $5)
+                        """,
+                        payload.asset_id,
+                        metric_id,
+                        sample.value,
+                        sample.observed_at,
+                        payload.collected_at,
+                    )
+                    await self._update_baseline(
+                        connection,
+                        asset_id=payload.asset_id,
+                        metric_id=metric_id,
+                        window=baseline_window,
+                        anomaly_threshold=anomaly_threshold,
+                        latest_observed_at=sample.observed_at,
+                        latest_value=sample.value,
+                    )
+                await connection.execute(
+                    """
+                    UPDATE telemetry_ingest_log
+                    SET status = $1,
+                        processed_at = NOW()
+                    WHERE payload_id = $2
+                    """,
+                    "accepted",
+                    payload.payload_id,
+                )
+
+    async def list_telemetry_metrics(self, asset_id: str) -> List[TelemetryMetricSummary]:
+        rows = await self.pool.fetch(
+            """
+            SELECT DISTINCT ON (s.metric_id)
+                   m.name,
+                   m.unit,
+                   s.value,
+                   s.observed_at
+            FROM telemetry_samples s
+            JOIN telemetry_metrics m ON m.metric_id = s.metric_id
+            WHERE s.asset_id = $1
+            ORDER BY s.metric_id, s.observed_at DESC
+            """,
+            asset_id,
+        )
+        return [
+            TelemetryMetricSummary(
+                name=row["name"],
+                unit=row["unit"],
+                last_value=row["value"],
+                last_observed_at=row["observed_at"],
+            )
+            for row in rows
+        ]
+
+    async def get_telemetry_series(
+        self,
+        asset_id: str,
+        metric_name: str,
+        since: Optional[datetime],
+        until: Optional[datetime],
+        limit: int,
+    ) -> TelemetrySeries:
+        rows = await self.pool.fetch(
+            """
+            SELECT s.value,
+                   s.observed_at,
+                   m.unit
+            FROM telemetry_samples s
+            JOIN telemetry_metrics m ON m.metric_id = s.metric_id
+            WHERE s.asset_id = $1
+              AND m.name = $2
+              AND ($3::timestamptz IS NULL OR s.observed_at >= $3)
+              AND ($4::timestamptz IS NULL OR s.observed_at <= $4)
+            ORDER BY s.observed_at DESC
+            LIMIT $5
+            """,
+            asset_id,
+            metric_name,
+            since,
+            until,
+            limit,
+        )
+        if not rows:
+            unit = metric_unit(metric_name)
+            return TelemetrySeries(
+                asset_id=asset_id,
+                metric_name=metric_name,
+                unit=unit,
+                points=[],
+            )
+        unit = rows[0]["unit"]
+        points = [
+            TelemetryPoint(
+                observed_at=row["observed_at"],
+                value=row["value"],
+            )
+            for row in rows
+        ]
+        points.reverse()
+        return TelemetrySeries(
+            asset_id=asset_id,
+            metric_name=metric_name,
+            unit=unit,
+            points=points,
+        )
 
     async def snapshot(self, asset_id: str) -> InventorySnapshot:
         asset = await self._fetch_asset_context(asset_id)
@@ -1006,3 +1158,165 @@ class InventoryStore:
             hostname=hostname,
             groups=groups,
         )
+
+    async def _record_telemetry_receipt(
+        self,
+        connection: asyncpg.Connection,
+        payload_id: UUID,
+        tenant_id: str,
+        asset_id: str,
+    ) -> None:
+        try:
+            await connection.execute(
+                """
+                INSERT INTO telemetry_ingest_log (
+                    payload_id,
+                    tenant_id,
+                    asset_id,
+                    status,
+                    received_at
+                )
+                VALUES ($1, $2, $3, $4, NOW())
+                """,
+                payload_id,
+                tenant_id,
+                asset_id,
+                "received",
+            )
+        except asyncpg.UniqueViolationError as exc:
+            raise TelemetryReplayError("payload_replay") from exc
+
+    async def record_telemetry_rejection(
+        self,
+        payload_id: UUID,
+        tenant_id: str,
+        asset_id: str,
+        reason: str,
+    ) -> None:
+        await self.pool.execute(
+            """
+            INSERT INTO telemetry_ingest_log (
+                payload_id,
+                tenant_id,
+                asset_id,
+                status,
+                received_at,
+                processed_at,
+                reject_reason
+            )
+            VALUES ($1, $2, $3, $4, NOW(), NOW(), $5)
+            ON CONFLICT (payload_id) DO NOTHING
+            """,
+            payload_id,
+            tenant_id,
+            asset_id,
+            "rejected",
+            reason,
+        )
+
+    async def _ensure_metric(
+        self,
+        connection: asyncpg.Connection,
+        name: str,
+        unit: str,
+    ) -> UUID:
+        description = metric_description(name)
+        row = await connection.fetchrow(
+            """
+            INSERT INTO telemetry_metrics (name, unit, description)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (name) DO UPDATE
+            SET unit = EXCLUDED.unit,
+                description = EXCLUDED.description
+            RETURNING metric_id
+            """,
+            name,
+            unit,
+            description,
+        )
+        return row["metric_id"]
+
+    async def _update_baseline(
+        self,
+        connection: asyncpg.Connection,
+        asset_id: str,
+        metric_id: UUID,
+        window: int,
+        anomaly_threshold: float,
+        latest_observed_at: datetime,
+        latest_value: float,
+    ) -> None:
+        stats = await connection.fetchrow(
+            """
+            SELECT AVG(value) AS avg_value,
+                   STDDEV_POP(value) AS stddev_value,
+                   COUNT(*) AS sample_count
+            FROM (
+                SELECT value
+                FROM telemetry_samples
+                WHERE asset_id = $1
+                  AND metric_id = $2
+                ORDER BY observed_at DESC
+                LIMIT $3
+            ) AS recent
+            """,
+            asset_id,
+            metric_id,
+            window,
+        )
+        if not stats:
+            return
+        avg_value = float(stats["avg_value"]) if stats["avg_value"] is not None else 0.0
+        stddev_value = (
+            float(stats["stddev_value"]) if stats["stddev_value"] is not None else 0.0
+        )
+        sample_count = int(stats["sample_count"] or 0)
+        await connection.execute(
+            """
+            INSERT INTO telemetry_baselines (
+                asset_id,
+                metric_id,
+                sample_count,
+                avg_value,
+                stddev_value,
+                updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (asset_id, metric_id) DO UPDATE
+            SET sample_count = EXCLUDED.sample_count,
+                avg_value = EXCLUDED.avg_value,
+                stddev_value = EXCLUDED.stddev_value,
+                updated_at = NOW()
+            """,
+            asset_id,
+            metric_id,
+            sample_count,
+            avg_value,
+            stddev_value,
+        )
+        if sample_count < max(window // 2, 5) or stddev_value <= 0:
+            return
+        deviation = abs(latest_value - avg_value)
+        if deviation >= anomaly_threshold * stddev_value:
+            await connection.execute(
+                """
+                INSERT INTO telemetry_anomalies (
+                    asset_id,
+                    metric_id,
+                    observed_at,
+                    value,
+                    baseline_value,
+                    deviation,
+                    status,
+                    created_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                """,
+                asset_id,
+                metric_id,
+                latest_observed_at,
+                latest_value,
+                avg_value,
+                deviation,
+                "open",
+            )
