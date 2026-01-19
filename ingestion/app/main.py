@@ -27,6 +27,8 @@ from .models import (
     TelemetryPayload,
     TelemetrySeries,
     TelemetryMetricSummary,
+    TelemetryBaseline,
+    TelemetryAnomaly,
 )
 from .storage import InventoryStore, TelemetryReplayError
 from .state import derive_state
@@ -211,6 +213,38 @@ async def get_telemetry_series(
         metric_name=metric_name,
         since=since,
         until=until,
+        limit=limit,
+    )
+
+
+@app.get(
+    "/telemetry/{asset_id}/baselines",
+    response_model=list[TelemetryBaseline],
+)
+async def list_telemetry_baselines(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[TelemetryBaseline]:
+    return await store.list_telemetry_baselines(asset_id)
+
+
+@app.get(
+    "/telemetry/{asset_id}/anomalies",
+    response_model=list[TelemetryAnomaly],
+)
+async def list_telemetry_anomalies(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    status: str | None = Query(default=None, min_length=3, max_length=16),
+    since: datetime | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=1000),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[TelemetryAnomaly]:
+    return await store.list_telemetry_anomalies(
+        asset_id=asset_id,
+        status=status,
+        since=since,
         limit=limit,
     )
 

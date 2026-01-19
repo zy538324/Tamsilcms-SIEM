@@ -27,6 +27,8 @@ from .models import (
     TelemetryPoint,
     TelemetrySample,
     TelemetrySeries,
+    TelemetryBaseline,
+    TelemetryAnomaly,
 )
 from .telemetry import metric_description, metric_unit
 
@@ -442,6 +444,84 @@ class InventoryStore:
             unit=unit,
             points=points,
         )
+
+    async def list_telemetry_baselines(self, asset_id: str) -> List[TelemetryBaseline]:
+        rows = await self.pool.fetch(
+            """
+            SELECT b.asset_id,
+                   m.name,
+                   m.unit,
+                   b.sample_count,
+                   b.avg_value,
+                   b.stddev_value,
+                   b.updated_at
+            FROM telemetry_baselines b
+            JOIN telemetry_metrics m ON m.metric_id = b.metric_id
+            WHERE b.asset_id = $1
+            ORDER BY m.name
+            """,
+            asset_id,
+        )
+        return [
+            TelemetryBaseline(
+                asset_id=str(row["asset_id"]),
+                metric_name=row["name"],
+                unit=row["unit"],
+                sample_count=row["sample_count"],
+                avg_value=row["avg_value"],
+                stddev_value=row["stddev_value"],
+                updated_at=row["updated_at"],
+            )
+            for row in rows
+        ]
+
+    async def list_telemetry_anomalies(
+        self,
+        asset_id: str,
+        status: Optional[str],
+        since: Optional[datetime],
+        limit: int,
+    ) -> List[TelemetryAnomaly]:
+        rows = await self.pool.fetch(
+            """
+            SELECT a.anomaly_id,
+                   a.asset_id,
+                   m.name,
+                   m.unit,
+                   a.observed_at,
+                   a.value,
+                   a.baseline_value,
+                   a.deviation,
+                   a.status,
+                   a.created_at
+            FROM telemetry_anomalies a
+            JOIN telemetry_metrics m ON m.metric_id = a.metric_id
+            WHERE a.asset_id = $1
+              AND ($2::text IS NULL OR a.status = $2)
+              AND ($3::timestamptz IS NULL OR a.observed_at >= $3)
+            ORDER BY a.observed_at DESC
+            LIMIT $4
+            """,
+            asset_id,
+            status,
+            since,
+            limit,
+        )
+        return [
+            TelemetryAnomaly(
+                anomaly_id=row["anomaly_id"],
+                asset_id=str(row["asset_id"]),
+                metric_name=row["name"],
+                unit=row["unit"],
+                observed_at=row["observed_at"],
+                value=row["value"],
+                baseline_value=row["baseline_value"],
+                deviation=row["deviation"],
+                status=row["status"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
 
     async def snapshot(self, asset_id: str) -> InventorySnapshot:
         asset = await self._fetch_asset_context(asset_id)

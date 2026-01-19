@@ -180,3 +180,26 @@ class TelemetrySeries(BaseModel):
     metric_name: str
     unit: str
     points: List[TelemetryPoint]
+
+
+class TelemetryBaseline(BaseModel):
+    asset_id: str
+    metric_name: str
+    unit: str
+    sample_count: int
+    avg_value: float
+    stddev_value: float
+    updated_at: datetime
+
+
+class TelemetryAnomaly(BaseModel):
+    anomaly_id: UUID
+    asset_id: str
+    metric_name: str
+    unit: str
+    observed_at: datetime
+    value: float
+    baseline_value: float
+    deviation: float
+    status: str
+    created_at: datetime
