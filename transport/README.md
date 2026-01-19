@@ -16,6 +16,10 @@ This directory now includes a minimal FastAPI gateway that accepts mTLS-backed
 - `POST /mtls/hello`: forwards signed hello payloads to identity.
 - `POST /mtls/events`: forwards signed event batches to ingestion.
 
+Headers (required for `POST /mtls/events`):
+- `X-Request-Signature`
+- `X-Request-Timestamp`
+
 ### Environment Variables
 - `TRANSPORT_ENV`: runtime environment name.
 - `TRANSPORT_IDENTITY_URL`: base URL for the identity service.
