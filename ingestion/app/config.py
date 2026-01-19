@@ -12,6 +12,11 @@ class Settings:
     database_dsn: str
     database_min_connections: int
     database_max_connections: int
+    telemetry_sample_limit: int
+    telemetry_stale_seconds: int
+    telemetry_future_seconds: int
+    telemetry_baseline_window: int
+    telemetry_anomaly_stddev_threshold: float
 
 
 def load_settings() -> Settings:
@@ -24,4 +29,11 @@ def load_settings() -> Settings:
         ),
         database_min_connections=int(os.environ.get("INGESTION_DB_MIN_CONN", "1")),
         database_max_connections=int(os.environ.get("INGESTION_DB_MAX_CONN", "5")),
+        telemetry_sample_limit=int(os.environ.get("INGESTION_TELEMETRY_SAMPLE_LIMIT", "500")),
+        telemetry_stale_seconds=int(os.environ.get("INGESTION_TELEMETRY_STALE_SECONDS", "600")),
+        telemetry_future_seconds=int(os.environ.get("INGESTION_TELEMETRY_FUTURE_SECONDS", "120")),
+        telemetry_baseline_window=int(os.environ.get("INGESTION_TELEMETRY_BASELINE_WINDOW", "20")),
+        telemetry_anomaly_stddev_threshold=float(
+            os.environ.get("INGESTION_TELEMETRY_ANOMALY_THRESHOLD", "3.0")
+        ),
     )
