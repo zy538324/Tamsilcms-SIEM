@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Dict, List, Union
+
 from pydantic import BaseModel, Field
 
 
@@ -85,3 +87,35 @@ class LocalGroup(BaseModel):
 
 class LocalGroupsInventory(InventoryBase):
     groups: list[LocalGroup]
+
+
+EventPayloadValue = Union[
+    str,
+    int,
+    float,
+    bool,
+    None,
+    List["EventPayloadValue"],
+    Dict[str, "EventPayloadValue"],
+]
+
+
+class EventEnvelope(BaseModel):
+    event_id: str = Field(..., min_length=8, max_length=64)
+    event_type: str = Field(..., min_length=3, max_length=80)
+    event_category: str = Field(..., min_length=3, max_length=32)
+    timestamp_local: datetime
+    sequence_number: int = Field(..., ge=0)
+    source_module: str = Field(..., min_length=3, max_length=64)
+    severity: str = Field(default="info", min_length=3, max_length=16)
+    payload: Dict[str, EventPayloadValue]
+    payload_hash: str = Field(..., min_length=32, max_length=128)
+
+
+class EventBatch(BaseModel):
+    payload_id: str = Field(..., min_length=8, max_length=64)
+    tenant_id: str = Field(..., min_length=8, max_length=64)
+    asset_id: str = Field(..., min_length=8, max_length=64)
+    collected_at: datetime
+    schema_version: str = Field(default="v1", max_length=16)
+    events: list[EventEnvelope]
