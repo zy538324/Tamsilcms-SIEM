@@ -77,6 +77,7 @@ DefenceModule::DefenceModule(const Config& config, DefencePolicy policy)
 DefenceFinding DefenceModule::EvaluateSignal(const BehaviourSignal& signal) {
     DefenceFinding finding{};
     finding.detection_id = "DEF-" + signal.name;
+    finding.rule_id = signal.rule_id;
     finding.behaviour_signature = signal.name;
     finding.confidence = signal.confidence;
     finding.process_id = signal.process_id;
@@ -85,14 +86,28 @@ DefenceFinding DefenceModule::EvaluateSignal(const BehaviourSignal& signal) {
         ? ToIsoTimestamp(std::chrono::system_clock::now())
         : signal.observed_at;
 
-    if (signal.confidence < policy_.min_confidence_threshold) {
+    if (!signal.response_defined) {
         finding.proposed_response = ResponseAction::kObserveOnly;
+        finding.decision_reason = "response undefined";
         return finding;
     }
 
-    finding.proposed_response = MapSignalToAction(signal.type);
-    if (policy_.mode == PolicyMode::kObserveOnly || IsRateLimited()) {
+    if (signal.confidence < policy_.min_confidence_threshold) {
         finding.proposed_response = ResponseAction::kObserveOnly;
+        finding.decision_reason = "confidence below threshold";
+        return finding;
+    }
+
+    finding.proposed_response = signal.requested_response;
+    if (policy_.mode == PolicyMode::kObserveOnly) {
+        finding.proposed_response = ResponseAction::kObserveOnly;
+        finding.decision_reason = "policy observe-only";
+        return finding;
+    }
+
+    if (IsRateLimited()) {
+        finding.proposed_response = ResponseAction::kObserveOnly;
+        finding.decision_reason = "rate limited";
     }
     return finding;
 }
@@ -104,6 +119,7 @@ DefenceEvidence DefenceModule::ApplyResponse(const DefenceFinding& finding) {
     evidence.timestamp = ToIsoTimestamp(std::chrono::system_clock::now());
     evidence.action = finding.proposed_response;
     evidence.permitted_by_policy = IsResponseAllowed(finding.proposed_response);
+    evidence.decision_reason = finding.decision_reason;
     evidence.before_state = "capture-before-state";
     evidence.after_state = "capture-after-state";
 
@@ -113,6 +129,7 @@ DefenceEvidence DefenceModule::ApplyResponse(const DefenceFinding& finding) {
 
     if (!evidence.permitted_by_policy) {
         evidence.action = ResponseAction::kObserveOnly;
+        evidence.decision_reason = "action blocked by policy";
     }
 
     return evidence;

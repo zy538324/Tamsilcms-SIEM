@@ -31,21 +31,26 @@ enum class PolicyMode {
 struct BehaviourSignal {
     BehaviourSignalType type;
     std::string name;
+    std::string rule_id;
     std::string process_id;
     std::string file_path;
     std::string command_line;
     double confidence;
     std::string observed_at;
+    bool response_defined;
+    ResponseAction requested_response;
 };
 
 struct DefenceFinding {
     std::string detection_id;
+    std::string rule_id;
     std::string behaviour_signature;
     double confidence;
     std::string process_id;
     std::string file_path;
     std::string timestamp;
     ResponseAction proposed_response;
+    std::string decision_reason;
 };
 
 struct DefenceEvidence {
@@ -53,6 +58,7 @@ struct DefenceEvidence {
     std::string policy_id;
     ResponseAction action;
     bool permitted_by_policy;
+    std::string decision_reason;
     std::string before_state;
     std::string after_state;
     std::string timestamp;
