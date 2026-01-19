@@ -91,6 +91,16 @@ def _validate_allowlist(settings: Settings, command_payload: str) -> None:
     )
 
 
+def _validate_output_limit(settings: Settings, value: Optional[str], field_name: str) -> None:
+    if value is None:
+        return
+    if len(value.encode("utf-8")) > settings.task_max_output_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"{field_name}_too_large",
+        )
+
+
 @app.get("/health", response_class=JSONResponse)
 async def health_check(settings: Settings = Depends(get_settings)) -> dict:
     """Simple health endpoint for load balancers."""
@@ -369,6 +379,15 @@ async def record_task_result(
             detail=reason,
         )
 
+    if payload.status not in {"completed", "failed"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_result_status",
+        )
+
+    _validate_output_limit(settings, payload.stdout, "stdout")
+    _validate_output_limit(settings, payload.stderr, "stderr")
+
     result = TaskResult(
         task_id=task_id,
         status=payload.status,
@@ -393,7 +412,13 @@ async def record_task_result(
             detail="task_scope_mismatch",
         )
 
-    task = task_store.record_result(result)
+    try:
+        task = task_store.record_result(result)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

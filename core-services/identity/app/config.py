@@ -20,6 +20,7 @@ class Settings:
     tasks_enabled: bool
     task_allowlist_patterns: tuple[str, ...]
     task_max_payload_bytes: int
+    task_max_output_bytes: int
 
 
 def load_settings() -> Settings:
@@ -40,4 +41,5 @@ def load_settings() -> Settings:
         tasks_enabled=os.environ.get("IDENTITY_TASKS_ENABLED", "false").lower() == "true",
         task_allowlist_patterns=allowlist,
         task_max_payload_bytes=int(os.environ.get("IDENTITY_TASK_MAX_PAYLOAD", "4096")),
+        task_max_output_bytes=int(os.environ.get("IDENTITY_TASK_MAX_OUTPUT", "8192")),
     )

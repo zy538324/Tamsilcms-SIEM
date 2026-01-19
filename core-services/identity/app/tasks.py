@@ -97,6 +97,10 @@ class TaskStore:
         task = self._tasks.get(result.task_id)
         if not task:
             return None
+        if task.state in {"completed", "failed"}:
+            raise ValueError("task_already_recorded")
+        if task.state == "expired":
+            raise ValueError("task_expired")
         task.finished_at = result.finished_at
         task.state = "completed" if result.status == "completed" else "failed"
         self._results[result.task_id] = result
