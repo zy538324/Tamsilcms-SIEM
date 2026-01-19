@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -203,3 +203,96 @@ class TelemetryAnomaly(BaseModel):
     deviation: float
     status: str
     created_at: datetime
+
+
+EventPayloadValue = Union[
+    str,
+    int,
+    float,
+    bool,
+    None,
+    List["EventPayloadValue"],
+    Dict[str, "EventPayloadValue"],
+]
+
+
+class EventEnvelope(BaseModel):
+    event_id: UUID
+    event_type: str = Field(..., min_length=3, max_length=80)
+    event_category: str = Field(..., min_length=3, max_length=32)
+    timestamp_local: datetime
+    sequence_number: int = Field(..., ge=0)
+    source_module: str = Field(..., min_length=3, max_length=64)
+    severity: str = Field(default="info", min_length=3, max_length=16)
+    payload: Dict[str, EventPayloadValue]
+    payload_hash: str = Field(..., min_length=32, max_length=128)
+
+
+class EventBatch(BaseModel):
+    payload_id: UUID
+    tenant_id: str = Field(..., min_length=8, max_length=64)
+    asset_id: str = Field(..., min_length=8, max_length=64)
+    collected_at: datetime
+    schema_version: str = Field(default="v1", max_length=16)
+    events: List[EventEnvelope]
+
+
+class EventGapReport(BaseModel):
+    asset_id: str
+    source_module: str
+    missing_from: int
+    missing_to: int
+    detected_at: datetime
+
+
+class EventClockDrift(BaseModel):
+    event_id: UUID
+    asset_id: str
+    source_module: str
+    drift_seconds: int
+    timestamp_local: datetime
+    timestamp_received: datetime
+
+
+class EventIngestResponse(BaseModel):
+    status: str
+    accepted: int
+    rejected: int
+    gaps: List[EventGapReport]
+    drifts: List[EventClockDrift]
+
+
+class EventIngestLogRecord(BaseModel):
+    payload_id: UUID
+    tenant_id: str
+    asset_id: str
+    status: str
+    received_at: datetime
+    processed_at: Optional[datetime] = None
+    event_count: int
+    accepted_count: int
+    rejected_count: int
+    reject_reason: Optional[str] = None
+    signature_verified: bool
+    schema_version: str
+
+
+class EventRecord(BaseModel):
+    event_id: UUID
+    tenant_id: str
+    asset_id: str
+    event_type: str
+    event_category: str
+    source_module: str
+    trust_level: str
+    severity: str
+    sequence_number: int
+    timestamp_local: datetime
+    timestamp_received: datetime
+    payload: Dict[str, EventPayloadValue]
+    payload_hash: str
+
+
+class EventTimeline(BaseModel):
+    asset_id: str
+    events: List[EventRecord]

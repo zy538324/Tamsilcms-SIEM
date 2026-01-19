@@ -226,6 +226,78 @@ CREATE TABLE event_enrichment (
     enriched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Event Ledger (MVP-7)
+CREATE TABLE event_ledger (
+    event_id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    event_type TEXT NOT NULL,
+    event_category TEXT NOT NULL,
+    source_module TEXT NOT NULL,
+    trust_level TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'info',
+    sequence_number BIGINT NOT NULL,
+    timestamp_local TIMESTAMPTZ NOT NULL,
+    timestamp_received TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    payload JSONB NOT NULL,
+    payload_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE event_ingest_log (
+    payload_id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    status TEXT NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMPTZ,
+    event_count INTEGER NOT NULL DEFAULT 0,
+    accepted_count INTEGER NOT NULL DEFAULT 0,
+    rejected_count INTEGER NOT NULL DEFAULT 0,
+    reject_reason TEXT,
+    signature TEXT,
+    signature_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    schema_version TEXT NOT NULL DEFAULT 'v1'
+);
+
+CREATE TABLE event_rejections (
+    rejection_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID NOT NULL,
+    payload_id UUID NOT NULL REFERENCES event_ingest_log(payload_id),
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    reason TEXT NOT NULL,
+    detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE event_sequence_state (
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    source_module TEXT NOT NULL,
+    last_sequence BIGINT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (asset_id, source_module)
+);
+
+CREATE TABLE event_gap_reports (
+    gap_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    source_module TEXT NOT NULL,
+    missing_from BIGINT NOT NULL,
+    missing_to BIGINT NOT NULL,
+    detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE event_clock_drifts (
+    drift_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID NOT NULL,
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    source_module TEXT NOT NULL,
+    drift_seconds INTEGER NOT NULL,
+    timestamp_local TIMESTAMPTZ NOT NULL,
+    timestamp_received TIMESTAMPTZ NOT NULL,
+    detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Detections & Findings
 CREATE TABLE detections (
     detection_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -409,6 +481,13 @@ CREATE INDEX idx_assets_tenant ON assets(tenant_id);
 CREATE INDEX idx_agents_asset ON agents(asset_id);
 CREATE INDEX idx_events_tenant_created ON events(tenant_id, created_at DESC);
 CREATE INDEX idx_events_asset ON events(asset_id);
+CREATE INDEX idx_event_ledger_asset_time ON event_ledger(asset_id, timestamp_received DESC);
+CREATE INDEX idx_event_ledger_tenant_time ON event_ledger(tenant_id, timestamp_received DESC);
+CREATE INDEX idx_event_ledger_category ON event_ledger(event_category);
+CREATE INDEX idx_event_ledger_type ON event_ledger(event_type);
+CREATE INDEX idx_event_ingest_log_asset ON event_ingest_log(asset_id, received_at DESC);
+CREATE INDEX idx_event_gap_reports_asset ON event_gap_reports(asset_id, detected_at DESC);
+CREATE INDEX idx_event_clock_drifts_asset ON event_clock_drifts(asset_id, detected_at DESC);
 CREATE INDEX idx_telemetry_samples_asset ON telemetry_samples(asset_id, observed_at DESC);
 CREATE INDEX idx_telemetry_samples_metric ON telemetry_samples(asset_id, metric_id, observed_at DESC);
 CREATE INDEX idx_telemetry_anomalies_asset ON telemetry_anomalies(asset_id, observed_at DESC);

@@ -18,3 +18,23 @@ Endpoints (read-only views are query-only):
 Constraints:
 - No direct network I/O; must use /transport.
 - No direct DB access from UI.
+
+## Event Ingestion (MVP-7)
+The ingestion service now accepts signed, immutable event batches and exposes
+read-only queries for timelines, event detail, data gaps, and clock drift. Events
+are verified for schema compliance, payload hashes, sequence continuity, and
+timestamp bounds before being stored in the append-only ledger.
+
+Endpoints:
+- `POST /events`
+- `GET /events/recent`
+- `GET /events/{event_id}`
+- `GET /events/assets/{asset_id}/timeline`
+- `GET /events/assets/{asset_id}/gaps`
+- `GET /events/assets/{asset_id}/clock-drifts`
+- `GET /events/ingest-log`
+- `GET /events/assets/{asset_id}/export.csv`
+
+Headers (required for `POST /events`):
+- `X-Request-Signature`
+- `X-Request-Timestamp`
