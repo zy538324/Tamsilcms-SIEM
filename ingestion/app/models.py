@@ -1,8 +1,9 @@
-"""Pydantic models for MVP-3 inventory ingestion."""
+"""Pydantic models for MVP-3 inventory ingestion and MVP-4 telemetry."""
 from __future__ import annotations
 
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -138,3 +139,67 @@ class AssetInventoryStats(BaseModel):
     assets_with_software: int
     assets_with_users: int
     assets_with_groups: int
+
+
+class TelemetrySample(BaseModel):
+    name: str = Field(..., min_length=3, max_length=128)
+    value: float
+    unit: Optional[str] = Field(default=None, max_length=32)
+    observed_at: datetime
+
+
+class TelemetryPayload(BaseModel):
+    payload_id: UUID
+    tenant_id: str = Field(..., min_length=8, max_length=64)
+    asset_id: str = Field(..., min_length=8, max_length=64)
+    collected_at: datetime
+    hostname: Optional[str] = None
+    schema_version: str = Field(default="v1", max_length=16)
+    samples: List[TelemetrySample]
+
+
+class TelemetryIngestResponse(BaseModel):
+    status: str
+    accepted_samples: int
+
+
+class TelemetryMetricSummary(BaseModel):
+    name: str
+    unit: str
+    last_value: float
+    last_observed_at: datetime
+
+
+class TelemetryPoint(BaseModel):
+    observed_at: datetime
+    value: float
+
+
+class TelemetrySeries(BaseModel):
+    asset_id: str
+    metric_name: str
+    unit: str
+    points: List[TelemetryPoint]
+
+
+class TelemetryBaseline(BaseModel):
+    asset_id: str
+    metric_name: str
+    unit: str
+    sample_count: int
+    avg_value: float
+    stddev_value: float
+    updated_at: datetime
+
+
+class TelemetryAnomaly(BaseModel):
+    anomaly_id: UUID
+    asset_id: str
+    metric_name: str
+    unit: str
+    observed_at: datetime
+    value: float
+    baseline_value: float
+    deviation: float
+    status: str
+    created_at: datetime
