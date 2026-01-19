@@ -31,6 +31,7 @@ class PatchStore:
             "policies": {},
             "plans": {},
             "evidence": {},
+            "assets": {},
         }
         self._load()
 
@@ -102,6 +103,13 @@ class PatchStore:
 
     def get_evidence(self, plan_id: UUID) -> Optional[dict]:
         return self._data["evidence"].get(str(plan_id))
+
+    def record_asset_state(self, asset_id: str, payload: dict) -> None:
+        self._data["assets"][asset_id] = _serialise(payload)
+        self._persist()
+
+    def get_asset_state(self, asset_id: str) -> Optional[dict]:
+        return self._data["assets"].get(asset_id)
 
 
 def _serialise(payload: Any) -> Any:

@@ -11,6 +11,9 @@ from fastapi.responses import JSONResponse
 from .config import Settings, load_settings
 from .evidence import build_evidence
 from .models import (
+    AssetBlockRequest,
+    AssetBlockResponse,
+    AssetPatchState,
     DetectionBatch,
     DetectionResponse,
     EvidenceResponse,
@@ -72,6 +75,37 @@ def _validate_log_limit(settings: Settings, value: Optional[str], field_name: st
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"{field_name}_too_large",
+        )
+
+
+def _map_detection_reboot_requirements(detection: DetectionBatch) -> dict[str, bool]:
+    return {patch.patch_id: patch.requires_reboot for patch in detection.patches}
+
+
+def _validate_results(
+    plan: ExecutionPlan,
+    results: list,
+    detection: DetectionBatch,
+    reboot_confirmed: bool,
+) -> None:
+    patch_ids = [result.patch_id for result in results]
+    if len(set(patch_ids)) != len(patch_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="duplicate_result_patch_ids",
+        )
+    missing = set(plan.execution_order) - set(patch_ids)
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="missing_result_patches",
+        )
+    reboot_required = _map_detection_reboot_requirements(detection)
+    requires_reboot = any(reboot_required.get(patch_id) for patch_id in plan.execution_order)
+    if requires_reboot and not reboot_confirmed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reboot_required_not_confirmed",
         )
 
 
@@ -282,6 +316,13 @@ async def record_results(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="result_patch_not_in_plan",
             )
+        if result.status == "failed" and not result.failure_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="failure_type_required",
+            )
+
+    _validate_results(plan, payload.results, detection, payload.reboot_confirmed)
 
     failed = any(result.status == "failed" for result in payload.results)
     if payload.verification_status == "passed" and not failed:
@@ -310,7 +351,53 @@ async def record_results(
             detail=str(exc),
         ) from exc
 
+    if failed or payload.verification_status == "failed":
+        asset_state = AssetPatchState(
+            tenant_id=payload.tenant_id,
+            asset_id=payload.asset_id,
+            status="patch_blocked",
+            reason="execution_or_verification_failed",
+            recorded_at=datetime.now(timezone.utc),
+        )
+        store.record_asset_state(payload.asset_id, asset_state.model_dump())
+
     return ExecutionResultResponse(status="recorded", plan_status=plan.status)
+
+
+@app.post("/assets/block", response_model=AssetBlockResponse)
+async def block_asset(
+    payload: AssetBlockRequest,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> AssetBlockResponse:
+    """Block patching for an asset after a failure event."""
+    asset_state = AssetPatchState(
+        tenant_id=payload.tenant_id,
+        asset_id=payload.asset_id,
+        status="patch_blocked",
+        reason=payload.reason,
+        recorded_at=payload.recorded_at,
+    )
+    store.record_asset_state(payload.asset_id, asset_state.model_dump())
+    return AssetBlockResponse(status="blocked", asset_state=asset_state)
+
+
+@app.get("/assets/{asset_id}/state", response_model=AssetPatchState)
+async def get_asset_state(
+    asset_id: str,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> AssetPatchState:
+    """Retrieve the current patch state for an asset."""
+    stored = store.get_asset_state(asset_id)
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="asset_state_not_found",
+        )
+    return AssetPatchState.model_validate(stored)
 
 
 @app.get("/plans/{plan_id}/tasks", response_model=TaskManifest)

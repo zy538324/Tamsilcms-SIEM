@@ -13,6 +13,13 @@ PatchCategory = Literal["security", "critical", "optional", "feature", "unknown"
 RebootRule = Literal["immediate", "deferred", "maintenance_window"]
 PlanStatus = Literal["planned", "executing", "completed", "failed"]
 VerificationStatus = Literal["pending", "passed", "failed"]
+FailureType = Literal[
+    "install_failure",
+    "timeout",
+    "reboot_failure",
+    "post_check_failure",
+    "unknown",
+]
 
 
 class PatchMetadata(BaseModel):
@@ -122,6 +129,7 @@ class ExecutionResult(BaseModel):
     stdout: Optional[str] = None
     stderr: Optional[str] = None
     exit_code: Optional[int] = None
+    failure_type: Optional[FailureType] = None
 
 
 class ExecutionResultRequest(BaseModel):
@@ -161,6 +169,28 @@ class TaskManifest(BaseModel):
     asset_id: str = Field(..., min_length=3, max_length=64)
     issued_at: datetime
     tasks: list[TaskDefinition]
+
+
+class AssetPatchState(BaseModel):
+    """Current patch state for an asset."""
+
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    asset_id: str = Field(..., min_length=3, max_length=64)
+    status: Literal["normal", "patch_blocked"]
+    reason: Optional[str] = Field(default=None, max_length=200)
+    recorded_at: datetime
+
+
+class AssetBlockRequest(BaseModel):
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    asset_id: str = Field(..., min_length=3, max_length=64)
+    reason: str = Field(..., min_length=5, max_length=200)
+    recorded_at: datetime
+
+
+class AssetBlockResponse(BaseModel):
+    status: Literal["blocked"]
+    asset_state: AssetPatchState
 
 
 class EvidenceRecord(BaseModel):
