@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import csv
+import io
 import asyncpg
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from .config import Settings, load_settings
 from .models import (
@@ -265,6 +267,58 @@ async def list_asset_overview_page(
         offset=offset,
         total=total,
     )
+
+
+@app.get("/inventory/assets/overview.csv", response_class=Response)
+async def export_asset_overviews_csv(
+    tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    limit: int = Query(default=500, ge=1, le=2000),
+    offset: int = Query(default=0, ge=0, le=100000),
+    since: datetime | None = Query(default=None),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> Response:
+    records = await store.list_asset_overviews(
+        tenant_id=tenant_id,
+        limit=limit,
+        offset=offset,
+        since=since,
+    )
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "asset_id",
+            "tenant_id",
+            "hostname",
+            "os_name",
+            "os_version",
+            "hardware_model",
+            "software_count",
+            "users_count",
+            "groups_count",
+            "last_seen_at",
+            "updated_at",
+        ]
+    )
+    for record in records:
+        writer.writerow(
+            [
+                record.asset_id,
+                record.tenant_id,
+                record.hostname,
+                record.os_name,
+                record.os_version,
+                record.hardware_model,
+                record.software_count,
+                record.users_count,
+                record.groups_count,
+                record.last_seen_at.isoformat() if record.last_seen_at else None,
+                record.updated_at.isoformat(),
+            ]
+        )
+    content = buffer.getvalue()
+    return Response(content=content, media_type="text/csv")
 
 
 @app.get(
