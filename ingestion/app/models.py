@@ -129,3 +129,12 @@ class AssetInventoryPage(BaseModel):
     limit: int
     offset: int
     total: int
+
+
+class AssetInventoryStats(BaseModel):
+    total_assets: int
+    assets_with_hardware: int
+    assets_with_os: int
+    assets_with_software: int
+    assets_with_users: int
+    assets_with_groups: int

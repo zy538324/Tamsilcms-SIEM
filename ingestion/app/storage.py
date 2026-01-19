@@ -11,6 +11,7 @@ from .models import (
     AssetInventoryOverview,
     AssetRecord,
     AssetStateResponse,
+    AssetInventoryStats,
     HardwareInventory,
     InventorySnapshot,
     LocalGroup,
@@ -608,6 +609,51 @@ class InventoryStore:
             groups_count=row["groups_count"],
             last_seen_at=row["last_seen_at"],
             updated_at=row["updated_at"],
+        )
+
+    async def get_asset_inventory_stats(
+        self, tenant_id: Optional[str] = None
+    ) -> AssetInventoryStats:
+        if tenant_id:
+            row = await self.pool.fetchrow(
+                """
+                WITH scoped_assets AS (
+                    SELECT asset_id FROM assets WHERE tenant_id = $1
+                )
+                SELECT
+                    (SELECT COUNT(*) FROM scoped_assets) AS total_assets,
+                    (SELECT COUNT(*) FROM hardware_inventory h
+                        JOIN scoped_assets sa ON sa.asset_id = h.asset_id) AS assets_with_hardware,
+                    (SELECT COUNT(*) FROM os_inventory o
+                        JOIN scoped_assets sa ON sa.asset_id = o.asset_id) AS assets_with_os,
+                    (SELECT COUNT(DISTINCT s.asset_id) FROM software_inventory s
+                        JOIN scoped_assets sa ON sa.asset_id = s.asset_id) AS assets_with_software,
+                    (SELECT COUNT(DISTINCT u.asset_id) FROM local_users u
+                        JOIN scoped_assets sa ON sa.asset_id = u.asset_id) AS assets_with_users,
+                    (SELECT COUNT(DISTINCT g.asset_id) FROM local_groups g
+                        JOIN scoped_assets sa ON sa.asset_id = g.asset_id) AS assets_with_groups
+                """,
+                tenant_id,
+            )
+        else:
+            row = await self.pool.fetchrow(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM assets) AS total_assets,
+                    (SELECT COUNT(*) FROM hardware_inventory) AS assets_with_hardware,
+                    (SELECT COUNT(*) FROM os_inventory) AS assets_with_os,
+                    (SELECT COUNT(DISTINCT asset_id) FROM software_inventory) AS assets_with_software,
+                    (SELECT COUNT(DISTINCT asset_id) FROM local_users) AS assets_with_users,
+                    (SELECT COUNT(DISTINCT asset_id) FROM local_groups) AS assets_with_groups
+                """
+            )
+        return AssetInventoryStats(
+            total_assets=row["total_assets"],
+            assets_with_hardware=row["assets_with_hardware"],
+            assets_with_os=row["assets_with_os"],
+            assets_with_software=row["assets_with_software"],
+            assets_with_users=row["assets_with_users"],
+            assets_with_groups=row["assets_with_groups"],
         )
 
     async def _fetch_asset_context(self, asset_id: str) -> Optional[asyncpg.Record]:

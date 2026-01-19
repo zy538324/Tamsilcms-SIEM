@@ -15,6 +15,7 @@ from .models import (
     SoftwareInventory,
     AssetInventoryOverview,
     AssetInventoryPage,
+    AssetInventoryStats,
     AssetRecord,
     AssetRecordPage,
     InventorySnapshot,
@@ -263,3 +264,12 @@ async def get_asset_overview(
             detail="asset_not_found",
         )
     return overview
+
+
+@app.get("/inventory/assets/stats", response_model=AssetInventoryStats)
+async def get_asset_inventory_stats(
+    tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> AssetInventoryStats:
+    return await store.get_asset_inventory_stats(tenant_id=tenant_id)
