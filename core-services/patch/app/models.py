@@ -141,6 +141,28 @@ class ExecutionResultResponse(BaseModel):
     plan_status: PlanStatus
 
 
+class TaskDefinition(BaseModel):
+    """A task to be executed by the MVP-5 execution engine."""
+
+    task_id: UUID
+    issued_by: str = Field(..., min_length=3, max_length=120)
+    policy_reference: str = Field(..., min_length=3, max_length=120)
+    execution_context: Literal["system", "root"]
+    interpreter: Literal["bash", "powershell"]
+    command_payload: str = Field(..., min_length=3, max_length=500)
+    expires_at: datetime
+
+
+class TaskManifest(BaseModel):
+    """Collection of tasks for a single execution plan."""
+
+    plan_id: UUID
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    asset_id: str = Field(..., min_length=3, max_length=64)
+    issued_at: datetime
+    tasks: list[TaskDefinition]
+
+
 class EvidenceRecord(BaseModel):
     plan_id: UUID
     detection_snapshot: DetectionBatch

@@ -21,10 +21,12 @@ from .models import (
     ExecutionResultResponse,
     PatchPolicy,
     PolicyResponse,
+    TaskManifest,
 )
 from .policy import evaluate_patches
 from .scheduler import build_execution_plan
 from .store import PatchStore, build_store
+from .tasks import build_task_manifest
 
 app = FastAPI(title="Patch Management Service", version="0.1.0")
 
@@ -275,6 +277,11 @@ async def record_results(
     for result in payload.results:
         _validate_log_limit(settings, result.stdout, "stdout")
         _validate_log_limit(settings, result.stderr, "stderr")
+        if result.patch_id not in plan.execution_order:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="result_patch_not_in_plan",
+            )
 
     failed = any(result.status == "failed" for result in payload.results)
     if payload.verification_status == "passed" and not failed:
@@ -304,6 +311,25 @@ async def record_results(
         ) from exc
 
     return ExecutionResultResponse(status="recorded", plan_status=plan.status)
+
+
+@app.get("/plans/{plan_id}/tasks", response_model=TaskManifest)
+async def get_task_manifest(
+    plan_id: UUID,
+    issued_by: str,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> TaskManifest:
+    """Return a deterministic task manifest for MVP-5 execution."""
+    plan_data = store.get_plan(plan_id)
+    if not plan_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="plan_not_found",
+        )
+    plan = ExecutionPlan.model_validate(plan_data)
+    return build_task_manifest(plan, issued_by=issued_by)
 
 
 @app.get("/evidence/{plan_id}", response_model=EvidenceResponse)

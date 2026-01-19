@@ -13,6 +13,7 @@ creates policy-bound execution plans, and records evidence for compliance.
 - `POST /policies`: create or update a signed policy definition.
 - `POST /plans`: generate a policy-driven execution plan.
 - `POST /plans/{plan_id}/results`: record execution results and verification.
+- `GET /plans/{plan_id}/tasks`: generate MVP-5 task manifest.
 - `GET /evidence/{plan_id}`: retrieve immutable evidence.
 
 ### Environment Variables
