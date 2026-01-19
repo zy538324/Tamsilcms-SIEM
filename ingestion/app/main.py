@@ -1,7 +1,7 @@
-"""Ingestion service entry point for MVP-3 inventory data."""
+"""Ingestion service entry point for MVP-3 inventory data and MVP-4 telemetry."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import csv
 import io
 import asyncpg
@@ -23,9 +23,16 @@ from .models import (
     InventorySnapshot,
     AssetStatePage,
     AssetStateResponse,
+    TelemetryIngestResponse,
+    TelemetryPayload,
+    TelemetrySeries,
+    TelemetryMetricSummary,
+    TelemetryBaseline,
+    TelemetryAnomaly,
 )
-from .storage import InventoryStore
+from .storage import InventoryStore, TelemetryReplayError
 from .state import derive_state
+from .telemetry import TelemetryValidationError, metric_unit, normalise_samples
 
 app = FastAPI(title="Ingestion Service", version="0.1.0")
 
@@ -42,6 +49,21 @@ def get_store() -> InventoryStore:
             detail="storage_unavailable",
         )
     return store
+
+
+def validate_sample_timestamps(
+    payload: TelemetryPayload,
+    now: datetime,
+    stale_seconds: int,
+    future_seconds: int,
+) -> None:
+    oldest_allowed = now - timedelta(seconds=stale_seconds)
+    newest_allowed = now + timedelta(seconds=future_seconds)
+    for sample in payload.samples:
+        if sample.observed_at < oldest_allowed:
+            raise TelemetryValidationError("sample_stale")
+        if sample.observed_at > newest_allowed:
+            raise TelemetryValidationError("sample_in_future")
 
 
 async def enforce_https(request: Request) -> None:
@@ -90,6 +112,173 @@ async def ingest_hardware(
     await store.upsert_hardware(payload)
     return {"status": "accepted"}
 
+
+@app.post("/telemetry", status_code=status.HTTP_202_ACCEPTED)
+async def ingest_telemetry(
+    payload: TelemetryPayload,
+    store: InventoryStore = Depends(get_store),
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+) -> TelemetryIngestResponse:
+    if len(payload.samples) > settings.telemetry_sample_limit:
+        await store.record_telemetry_rejection(
+            payload_id=payload.payload_id,
+            tenant_id=payload.tenant_id,
+            asset_id=payload.asset_id,
+            reason="payload_too_large",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="payload_too_large",
+        )
+    now = datetime.now(timezone.utc)
+    if payload.collected_at < now - timedelta(seconds=settings.telemetry_stale_seconds):
+        await store.record_telemetry_rejection(
+            payload_id=payload.payload_id,
+            tenant_id=payload.tenant_id,
+            asset_id=payload.asset_id,
+            reason="payload_stale",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="payload_stale",
+        )
+    if payload.collected_at > now + timedelta(seconds=settings.telemetry_future_seconds):
+        await store.record_telemetry_rejection(
+            payload_id=payload.payload_id,
+            tenant_id=payload.tenant_id,
+            asset_id=payload.asset_id,
+            reason="payload_in_future",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="payload_in_future",
+        )
+    try:
+        validate_sample_timestamps(
+            payload=payload,
+            now=now,
+            stale_seconds=settings.telemetry_stale_seconds,
+            future_seconds=settings.telemetry_future_seconds,
+        )
+        samples = normalise_samples(payload.samples)
+    except TelemetryValidationError as exc:
+        await store.record_telemetry_rejection(
+            payload_id=payload.payload_id,
+            tenant_id=payload.tenant_id,
+            asset_id=payload.asset_id,
+            reason=exc.reason,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.reason,
+        ) from exc
+    try:
+        await store.ingest_telemetry(
+            payload=payload,
+            samples=samples,
+            baseline_window=settings.telemetry_baseline_window,
+            anomaly_threshold=settings.telemetry_anomaly_stddev_threshold,
+        )
+    except TelemetryReplayError as exc:
+        await store.record_telemetry_rejection(
+            payload_id=payload.payload_id,
+            tenant_id=payload.tenant_id,
+            asset_id=payload.asset_id,
+            reason="payload_replay",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="payload_replay",
+        ) from exc
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        await store.record_telemetry_rejection(
+            payload_id=payload.payload_id,
+            tenant_id=payload.tenant_id,
+            asset_id=payload.asset_id,
+            reason="ingest_failed",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ingest_failed",
+        ) from exc
+    return TelemetryIngestResponse(
+        status="accepted",
+        accepted_samples=len(samples),
+    )
+
+
+@app.get(
+    "/telemetry/{asset_id}/metrics",
+    response_model=list[TelemetryMetricSummary],
+)
+async def list_telemetry_metrics(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[TelemetryMetricSummary]:
+    return await store.list_telemetry_metrics(asset_id)
+
+
+@app.get(
+    "/telemetry/{asset_id}/series",
+    response_model=TelemetrySeries,
+)
+async def get_telemetry_series(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    metric_name: str = Query(..., min_length=3, max_length=128),
+    since: datetime | None = Query(default=None),
+    until: datetime | None = Query(default=None),
+    limit: int = Query(default=500, ge=1, le=5000),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> TelemetrySeries:
+    try:
+        metric_unit(metric_name)
+    except TelemetryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.reason,
+        ) from exc
+    return await store.get_telemetry_series(
+        asset_id=asset_id,
+        metric_name=metric_name,
+        since=since,
+        until=until,
+        limit=limit,
+    )
+
+
+@app.get(
+    "/telemetry/{asset_id}/baselines",
+    response_model=list[TelemetryBaseline],
+)
+async def list_telemetry_baselines(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[TelemetryBaseline]:
+    return await store.list_telemetry_baselines(asset_id)
+
+
+@app.get(
+    "/telemetry/{asset_id}/anomalies",
+    response_model=list[TelemetryAnomaly],
+)
+async def list_telemetry_anomalies(
+    asset_id: str = Path(..., min_length=8, max_length=64),
+    status: str | None = Query(default=None, min_length=3, max_length=16),
+    since: datetime | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=1000),
+    store: InventoryStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+) -> list[TelemetryAnomaly]:
+    return await store.list_telemetry_anomalies(
+        asset_id=asset_id,
+        status=status,
+        since=since,
+        limit=limit,
+    )
 
 @app.post("/inventory/os", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_os(

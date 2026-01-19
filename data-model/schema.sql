@@ -171,6 +171,38 @@ CREATE TABLE telemetry_samples (
     collected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE telemetry_baselines (
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    metric_id UUID NOT NULL REFERENCES telemetry_metrics(metric_id),
+    sample_count INTEGER NOT NULL DEFAULT 0,
+    avg_value DOUBLE PRECISION NOT NULL DEFAULT 0,
+    stddev_value DOUBLE PRECISION NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (asset_id, metric_id)
+);
+
+CREATE TABLE telemetry_anomalies (
+    anomaly_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    metric_id UUID NOT NULL REFERENCES telemetry_metrics(metric_id),
+    observed_at TIMESTAMPTZ NOT NULL,
+    value DOUBLE PRECISION NOT NULL,
+    baseline_value DOUBLE PRECISION NOT NULL,
+    deviation DOUBLE PRECISION NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE telemetry_ingest_log (
+    payload_id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    status TEXT NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMPTZ,
+    reject_reason TEXT
+);
+
 -- Events (SIEM ledger)
 CREATE TABLE events (
     event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -369,5 +401,8 @@ CREATE INDEX idx_agents_asset ON agents(asset_id);
 CREATE INDEX idx_events_tenant_created ON events(tenant_id, created_at DESC);
 CREATE INDEX idx_events_asset ON events(asset_id);
 CREATE INDEX idx_telemetry_samples_asset ON telemetry_samples(asset_id, observed_at DESC);
+CREATE INDEX idx_telemetry_samples_metric ON telemetry_samples(asset_id, metric_id, observed_at DESC);
+CREATE INDEX idx_telemetry_anomalies_asset ON telemetry_anomalies(asset_id, observed_at DESC);
+CREATE INDEX idx_telemetry_ingest_log_asset ON telemetry_ingest_log(asset_id, received_at DESC);
 CREATE INDEX idx_tasks_asset ON tasks(asset_id);
 CREATE INDEX idx_ticket_status ON tickets(status);
