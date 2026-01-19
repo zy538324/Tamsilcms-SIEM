@@ -1,0 +1,3 @@
+C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/CMakeFiles/agent_hello.dir
+C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/CMakeFiles/ZERO_CHECK.dir
