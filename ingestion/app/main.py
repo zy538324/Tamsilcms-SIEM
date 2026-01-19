@@ -66,6 +66,14 @@ def validate_sample_timestamps(
             raise TelemetryValidationError("sample_in_future")
 
 
+def validate_sample_uniqueness(payload: TelemetryPayload) -> None:
+    seen_names: set[str] = set()
+    for sample in payload.samples:
+        if sample.name in seen_names:
+            raise TelemetryValidationError("duplicate_metric")
+        seen_names.add(sample.name)
+
+
 async def enforce_https(request: Request) -> None:
     forwarded_proto = request.headers.get("x-forwarded-proto", "http")
     if forwarded_proto.lower() != "https":
@@ -161,6 +169,7 @@ async def ingest_telemetry(
             stale_seconds=settings.telemetry_stale_seconds,
             future_seconds=settings.telemetry_future_seconds,
         )
+        validate_sample_uniqueness(payload)
         samples = normalise_samples(payload.samples)
     except TelemetryValidationError as exc:
         await store.record_telemetry_rejection(
