@@ -6,6 +6,7 @@ transport layer. It enforces strict request validation and HTTPS-only access.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -29,8 +30,16 @@ from .models import (
     AgentStateResponse,
     RiskScoreResponse,
     AgentPresenceResponse,
+    TaskCreateRequest,
+    TaskCreateResponse,
+    TaskPollRequest,
+    TaskPollResponse,
+    TaskRecordResponse,
+    TaskResultRequest,
+    TaskResultResponse,
 )
-from .security import SignatureError, verify_signature
+from .security import verify_signature
+from .tasks import Task, TaskResult, store as task_store
 
 app = FastAPI(title="Identity Service", version="0.1.0")
 
@@ -50,6 +59,45 @@ async def enforce_https(request: Request) -> None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="https_required",
+        )
+
+
+def _require_execution_enabled(settings: Settings) -> None:
+    if not settings.tasks_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="execution_disabled",
+        )
+
+
+def _validate_allowlist(settings: Settings, command_payload: str) -> None:
+    payload_bytes = command_payload.encode("utf-8")
+    if len(payload_bytes) > settings.task_max_payload_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="payload_too_large",
+        )
+
+    if not settings.task_allowlist_patterns:
+        return
+
+    for pattern in settings.task_allowlist_patterns:
+        if re.fullmatch(pattern, command_payload):
+            return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="command_not_allowlisted",
+    )
+
+
+def _validate_output_limit(settings: Settings, value: Optional[str], field_name: str) -> None:
+    if value is None:
+        return
+    if len(value.encode("utf-8")) > settings.task_max_output_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"{field_name}_too_large",
         )
 
 
@@ -149,6 +197,237 @@ async def hello(
         status="verified",
         received_at=datetime.now(timezone.utc),
         service=settings.service_name,
+    )
+
+
+@app.post("/tasks", response_model=TaskCreateResponse)
+async def create_task(
+    request: Request,
+    payload: TaskCreateRequest,
+    settings: Settings = Depends(get_settings),
+    signature: Optional[str] = Header(None, alias="X-Request-Signature"),
+    timestamp: Optional[str] = Header(None, alias="X-Request-Timestamp"),
+    _: None = Depends(enforce_https),
+) -> TaskCreateResponse:
+    """Create a signed, immutable task for remote execution."""
+    _require_execution_enabled(settings)
+
+    if not signature or not timestamp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="missing_signature_headers",
+        )
+
+    try:
+        timestamp_int = int(timestamp)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_timestamp",
+        ) from exc
+
+    raw_body = json.dumps(payload.model_dump(), separators=(",", ":")).encode(
+        "utf-8"
+    )
+    valid, reason = verify_signature(settings, raw_body, signature, timestamp_int)
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=reason,
+        )
+
+    if payload.execution_context.lower() not in {"system", "root"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_execution_context",
+        )
+
+    if payload.interpreter.lower() not in {"bash", "powershell"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_interpreter",
+        )
+
+    _validate_allowlist(settings, payload.command_payload)
+
+    if payload.expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="expiry_in_past",
+        )
+
+    task = Task(
+        task_id=payload.task_id,
+        tenant_id=payload.tenant_id,
+        asset_id=payload.asset_id,
+        issued_by=payload.issued_by,
+        policy_reference=payload.policy_reference,
+        execution_context=payload.execution_context,
+        interpreter=payload.interpreter,
+        command_payload=payload.command_payload,
+        expires_at=payload.expires_at,
+        signature=signature,
+    )
+    try:
+        task_store.create(task)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    return TaskCreateResponse(
+        status="created",
+        task_id=task.task_id,
+        created_at=task.created_at,
+    )
+
+
+@app.post("/tasks/poll", response_model=TaskPollResponse)
+async def poll_tasks(
+    request: Request,
+    payload: TaskPollRequest,
+    settings: Settings = Depends(get_settings),
+    signature: Optional[str] = Header(None, alias="X-Request-Signature"),
+    timestamp: Optional[str] = Header(None, alias="X-Request-Timestamp"),
+    _: None = Depends(enforce_https),
+) -> TaskPollResponse:
+    """Poll for pending tasks for an asset."""
+    _require_execution_enabled(settings)
+
+    if not signature or not timestamp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="missing_signature_headers",
+        )
+
+    try:
+        timestamp_int = int(timestamp)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_timestamp",
+        ) from exc
+
+    raw_body = json.dumps(payload.model_dump(), separators=(",", ":")).encode(
+        "utf-8"
+    )
+    valid, reason = verify_signature(settings, raw_body, signature, timestamp_int)
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=reason,
+        )
+
+    tasks = task_store.list_pending(payload.asset_id)
+    for task in tasks:
+        task_store.mark_delivered(task.task_id)
+
+    return TaskPollResponse(
+        status="ok",
+        tasks=[
+            TaskRecordResponse(
+                task_id=task.task_id,
+                tenant_id=task.tenant_id,
+                asset_id=task.asset_id,
+                issued_by=task.issued_by,
+                policy_reference=task.policy_reference,
+                execution_context=task.execution_context,
+                interpreter=task.interpreter,
+                command_payload=task.command_payload,
+                expires_at=task.expires_at,
+            )
+            for task in tasks
+        ],
+    )
+
+
+@app.post("/tasks/{task_id}/results", response_model=TaskResultResponse)
+async def record_task_result(
+    task_id: str,
+    request: Request,
+    payload: TaskResultRequest,
+    settings: Settings = Depends(get_settings),
+    signature: Optional[str] = Header(None, alias="X-Request-Signature"),
+    timestamp: Optional[str] = Header(None, alias="X-Request-Timestamp"),
+    _: None = Depends(enforce_https),
+) -> TaskResultResponse:
+    """Record the outcome of a task execution."""
+    _require_execution_enabled(settings)
+
+    if not signature or not timestamp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="missing_signature_headers",
+        )
+
+    try:
+        timestamp_int = int(timestamp)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_timestamp",
+        ) from exc
+
+    raw_body = json.dumps(payload.model_dump(), separators=(",", ":")).encode(
+        "utf-8"
+    )
+    valid, reason = verify_signature(settings, raw_body, signature, timestamp_int)
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=reason,
+        )
+
+    if payload.status not in {"completed", "failed"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_result_status",
+        )
+
+    _validate_output_limit(settings, payload.stdout, "stdout")
+    _validate_output_limit(settings, payload.stderr, "stderr")
+
+    result = TaskResult(
+        task_id=task_id,
+        status=payload.status,
+        stdout=payload.stdout,
+        stderr=payload.stderr,
+        exit_code=payload.exit_code,
+        started_at=payload.started_at,
+        finished_at=payload.finished_at,
+        duration_ms=payload.duration_ms,
+        truncated=payload.truncated,
+    )
+    task = task_store.get(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="task_not_found",
+        )
+
+    if task.tenant_id != payload.tenant_id or task.asset_id != payload.asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="task_scope_mismatch",
+        )
+
+    try:
+        task = task_store.record_result(result)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="task_not_found",
+        )
+
+    return TaskResultResponse(
+        status="recorded",
+        recorded_at=result.recorded_at,
     )
 
 
