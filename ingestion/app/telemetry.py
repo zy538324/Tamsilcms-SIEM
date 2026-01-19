@@ -158,6 +158,8 @@ def normalise_samples(samples: Iterable[TelemetrySample]) -> List[TelemetrySampl
         if not math.isfinite(value):
             raise TelemetryValidationError("value_not_finite")
         if rule.integer_only:
+            if value % 1 != 0:
+                raise TelemetryValidationError("value_not_integer")
             value = float(int(value))
         if rule.min_value is not None and value < rule.min_value:
             raise TelemetryValidationError("value_below_min")
