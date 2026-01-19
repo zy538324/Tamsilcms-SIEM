@@ -22,6 +22,7 @@ from .models import (
     DetectionResponse,
     EvidenceResponse,
     EvidenceRecord,
+    EvidenceHashResponse,
     ExecutionPlanRequest,
     ExecutionPlanResponse,
     ExecutionResultRequest,
@@ -40,6 +41,7 @@ from .models import (
     NextWindowResponse,
 )
 from .policy import evaluate_patches, next_maintenance_window
+from .evidence import _hash_evidence
 from .scheduler import build_execution_plan
 from .store import PatchStore, build_store
 from .tasks import build_task_manifest
@@ -669,3 +671,22 @@ async def get_evidence(
         status="ok",
         evidence=EvidenceRecord.model_validate(stored),
     )
+
+
+@app.get("/evidence/{plan_id}/hash", response_model=EvidenceHashResponse)
+async def get_evidence_hash(
+    plan_id: UUID,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> EvidenceHashResponse:
+    """Return the evidence hash for a plan."""
+    stored = store.get_evidence(plan_id)
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="evidence_not_found",
+        )
+    record = EvidenceRecord.model_validate(stored)
+    evidence_hash = record.evidence_hash or _hash_evidence(record)
+    return EvidenceHashResponse(status="ok", plan_id=plan_id, evidence_hash=evidence_hash)

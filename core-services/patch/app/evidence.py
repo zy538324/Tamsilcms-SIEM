@@ -1,6 +1,8 @@
 """Evidence capture helpers."""
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timezone
 
 from .models import (
@@ -26,7 +28,7 @@ def build_evidence(
     finished_at: datetime,
 ) -> EvidenceRecord:
     """Assemble immutable evidence of a patch execution cycle."""
-    return EvidenceRecord(
+    record = EvidenceRecord(
         plan_id=plan.plan_id,
         detection_snapshot=detection,
         policy_snapshot=policy,
@@ -39,3 +41,11 @@ def build_evidence(
         started_at=started_at,
         finished_at=finished_at,
     )
+    record.evidence_hash = _hash_evidence(record)
+    return record
+
+
+def _hash_evidence(record: EvidenceRecord) -> str:
+    payload = record.model_dump(exclude={"evidence_hash"})
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()

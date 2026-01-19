@@ -296,8 +296,15 @@ class EvidenceRecord(BaseModel):
     started_at: datetime
     finished_at: datetime
     verification_notes: Optional[str] = None
+    evidence_hash: Optional[str] = None
 
 
 class EvidenceResponse(BaseModel):
     status: Literal["ok"]
     evidence: EvidenceRecord
+
+
+class EvidenceHashResponse(BaseModel):
+    status: Literal["ok"]
+    plan_id: UUID
+    evidence_hash: str

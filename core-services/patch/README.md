@@ -25,6 +25,7 @@ creates policy-bound execution plans, and records evidence for compliance.
 - `GET /compliance/{tenant_id}`: compliance overview for a tenant.
 - `GET /policies/{policy_id}/next-window`: next maintenance window.
 - `GET /evidence/{plan_id}`: retrieve immutable evidence.
+- `GET /evidence/{plan_id}/hash`: retrieve evidence hash.
 
 ### Environment Variables
 - `PATCH_ENV`: runtime environment name.
