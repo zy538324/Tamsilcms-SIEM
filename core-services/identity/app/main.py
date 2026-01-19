@@ -377,7 +377,7 @@ async def poll_tasks(
 
     tasks = task_store.list_pending(payload.tenant_id, payload.asset_id)
     for task in tasks:
-        task_store.mark_delivered(task.task_id)
+        task_store.mark_delivered(task.task_id, payload.agent_id)
 
     return TaskPollResponse(
         status="ok",
@@ -475,6 +475,12 @@ async def record_task_result(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="task_not_found",
+        )
+
+    if task.delivered_to_agent and task.delivered_to_agent != payload.agent_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="task_agent_mismatch",
         )
 
     if task.tenant_id != payload.tenant_id or task.asset_id != payload.asset_id:

@@ -32,6 +32,7 @@ class Task:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     state: str = "pending"
     delivered_at: Optional[datetime] = None
+    delivered_to_agent: Optional[str] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     last_error: Optional[str] = None
@@ -80,7 +81,7 @@ class TaskStore:
             and task.state == "pending"
         ]
 
-    def mark_delivered(self, task_id: str) -> Optional[Task]:
+    def mark_delivered(self, task_id: str, agent_id: str) -> Optional[Task]:
         task = self._tasks.get(task_id)
         if not task:
             return None
@@ -88,6 +89,7 @@ class TaskStore:
             return task
         task.state = "delivered"
         task.delivered_at = datetime.now(timezone.utc)
+        task.delivered_to_agent = agent_id
         return task
 
     def mark_executing(self, task_id: str, started_at: datetime) -> Optional[Task]:
