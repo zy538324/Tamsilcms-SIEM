@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import string
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
 from .config import Settings
-from datetime import datetime, timezone
-
 from .models import EventIngestRequest, RuleDefinition
 
 

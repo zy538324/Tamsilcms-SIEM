@@ -21,6 +21,7 @@ from .models import (
     RuleDefinition,
     RuleListResponse,
     RuleResponse,
+    SuppressionListResponse,
 )
 from .rules import default_rules
 from .store import init_stores, store
@@ -183,17 +184,37 @@ async def dismiss_finding(
     return DismissFindingResponse(status="dismissed", finding_id=finding_id, dismissed_at=payload.dismissed_at)
 
 
-@app.get("/suppressions", response_class=JSONResponse)
-async def list_suppressions(settings: Settings = Depends(get_settings)) -> dict:
+@app.get("/suppressions", response_model=SuppressionListResponse)
+async def list_suppressions(
+    settings: Settings = Depends(get_settings),
+    rule_id: Optional[str] = None,
+    limit: int = 50,
+) -> SuppressionListResponse:
     """List suppression decisions for auditing."""
     if store is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="store_unavailable")
-    return {"decisions": store.suppressions.list()}
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="limit_out_of_range")
+    decisions = store.suppressions.list()
+    if rule_id:
+        decisions = [decision for decision in decisions if decision.rule_id == rule_id]
+    decisions = decisions[:limit]
+    return SuppressionListResponse(decisions=decisions)
 
 
 @app.get("/dismissals", response_model=DismissalListResponse)
-async def list_dismissals(settings: Settings = Depends(get_settings)) -> DismissalListResponse:
+async def list_dismissals(
+    settings: Settings = Depends(get_settings),
+    identity_id: Optional[str] = None,
+    limit: int = 50,
+) -> DismissalListResponse:
     """List dismissal decisions for auditing."""
     if store is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="store_unavailable")
-    return DismissalListResponse(dismissals=store.dismissals.list())
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="limit_out_of_range")
+    decisions = store.dismissals.list()
+    if identity_id:
+        decisions = [decision for decision in decisions if decision.identity_id == identity_id]
+    decisions = decisions[:limit]
+    return DismissalListResponse(dismissals=decisions)

@@ -215,6 +215,10 @@ class SuppressionDecision(BaseModel):
     suppressed_at: datetime
 
 
+class SuppressionListResponse(BaseModel):
+    decisions: list[SuppressionDecision]
+
+
 class DismissalDecision(BaseModel):
     """Audit record for dismissal decisions."""
 
