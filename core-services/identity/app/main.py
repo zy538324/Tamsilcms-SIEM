@@ -426,6 +426,12 @@ async def record_task_result(
             detail="invalid_result_status",
         )
 
+    if payload.task_id != task_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="task_id_mismatch",
+        )
+
     _validate_result_timing(
         settings,
         payload.started_at,

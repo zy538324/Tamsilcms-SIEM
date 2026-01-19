@@ -156,6 +156,7 @@ class TaskResultRequest(BaseModel):
     tenant_id: str = Field(..., min_length=8, max_length=64)
     asset_id: str = Field(..., min_length=8, max_length=64)
     agent_id: str = Field(..., min_length=8, max_length=64)
+    task_id: str = Field(..., min_length=8, max_length=64)
     status: str = Field(..., min_length=3, max_length=32)
     stdout: str | None = None
     stderr: str | None = None
