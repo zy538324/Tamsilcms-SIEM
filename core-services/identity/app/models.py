@@ -97,3 +97,78 @@ class CertificateRevokeResponse(BaseModel):
 
     status: str
     revoked_at: datetime
+
+
+class TaskCreateRequest(BaseModel):
+    """Request to create a signed remote execution task."""
+
+    tenant_id: str = Field(..., min_length=8, max_length=64)
+    asset_id: str = Field(..., min_length=8, max_length=64)
+    task_id: str = Field(..., min_length=8, max_length=64)
+    issued_by: str = Field(..., min_length=8, max_length=64)
+    policy_reference: str = Field(..., min_length=3, max_length=128)
+    execution_context: str = Field(..., min_length=3, max_length=32)
+    interpreter: str = Field(..., min_length=3, max_length=32)
+    command_payload: str = Field(..., min_length=1, max_length=8192)
+    expires_at: datetime
+
+
+class TaskCreateResponse(BaseModel):
+    """Response after creating a remote execution task."""
+
+    status: str
+    task_id: str
+    created_at: datetime
+
+
+class TaskPollRequest(BaseModel):
+    """Agent polling request for pending tasks."""
+
+    tenant_id: str = Field(..., min_length=8, max_length=64)
+    asset_id: str = Field(..., min_length=8, max_length=64)
+    agent_id: str = Field(..., min_length=8, max_length=64)
+
+
+class TaskRecordResponse(BaseModel):
+    """Task record returned to agents."""
+
+    task_id: str
+    tenant_id: str
+    asset_id: str
+    issued_by: str
+    policy_reference: str
+    execution_context: str
+    interpreter: str
+    command_payload: str
+    expires_at: datetime
+
+
+class TaskPollResponse(BaseModel):
+    """Response for polling tasks."""
+
+    status: str
+    tasks: list[TaskRecordResponse]
+
+
+class TaskResultRequest(BaseModel):
+    """Execution result reported by the agent."""
+
+    tenant_id: str = Field(..., min_length=8, max_length=64)
+    asset_id: str = Field(..., min_length=8, max_length=64)
+    agent_id: str = Field(..., min_length=8, max_length=64)
+    task_id: str = Field(..., min_length=8, max_length=64)
+    status: str = Field(..., min_length=3, max_length=32)
+    stdout: str | None = None
+    stderr: str | None = None
+    exit_code: int | None = None
+    started_at: datetime
+    finished_at: datetime
+    duration_ms: int = Field(..., ge=0)
+    truncated: bool = False
+
+
+class TaskResultResponse(BaseModel):
+    """Response after recording a task execution result."""
+
+    status: str
+    recorded_at: datetime
