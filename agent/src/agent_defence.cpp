@@ -30,6 +30,21 @@ std::string ToIsoTimestamp(const std::chrono::system_clock::time_point& timepoin
     return stream.str();
 }
 
+ResponseAction MapSignalToAction(BehaviourSignalType type) {
+    switch (type) {
+        case BehaviourSignalType::kProcess:
+            return ResponseAction::kKillProcess;
+        case BehaviourSignalType::kMemory:
+            return ResponseAction::kKillProcess;
+        case BehaviourSignalType::kFile:
+            return ResponseAction::kQuarantineFile;
+        case BehaviourSignalType::kPrivilege:
+            return ResponseAction::kBlockNetwork;
+        default:
+            return ResponseAction::kObserveOnly;
+    }
+}
+
 bool ParseBoolEnv(const std::string& value, bool fallback) {
     if (value == "true" || value == "1" || value == "yes") {
         return true;
