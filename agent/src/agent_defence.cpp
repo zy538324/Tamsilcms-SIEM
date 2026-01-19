@@ -30,21 +30,6 @@ std::string ToIsoTimestamp(const std::chrono::system_clock::time_point& timepoin
     return stream.str();
 }
 
-ResponseAction MapSignalToAction(BehaviourSignalType type) {
-    switch (type) {
-        case BehaviourSignalType::kProcess:
-            return ResponseAction::kKillProcess;
-        case BehaviourSignalType::kMemory:
-            return ResponseAction::kKillProcess;
-        case BehaviourSignalType::kFile:
-            return ResponseAction::kQuarantineFile;
-        case BehaviourSignalType::kPrivilege:
-            return ResponseAction::kBlockNetwork;
-        default:
-            return ResponseAction::kObserveOnly;
-    }
-}
-
 bool ParseBoolEnv(const std::string& value, bool fallback) {
     if (value == "true" || value == "1" || value == "yes") {
         return true;
@@ -53,6 +38,14 @@ bool ParseBoolEnv(const std::string& value, bool fallback) {
         return false;
     }
     return fallback;
+}
+
+bool RequiresProcessId(ResponseAction action) {
+    return action == ResponseAction::kKillProcess || action == ResponseAction::kBlockNetwork;
+}
+
+bool RequiresFilePath(ResponseAction action) {
+    return action == ResponseAction::kQuarantineFile || action == ResponseAction::kPreventExecution;
 }
 }  // namespace
 
@@ -99,6 +92,23 @@ DefenceFinding DefenceModule::EvaluateSignal(const BehaviourSignal& signal) {
     }
 
     finding.proposed_response = signal.requested_response;
+    if (finding.proposed_response == ResponseAction::kObserveOnly) {
+        finding.decision_reason = "rule observe-only";
+        return finding;
+    }
+
+    if (RequiresProcessId(finding.proposed_response) && finding.process_id.empty()) {
+        finding.proposed_response = ResponseAction::kObserveOnly;
+        finding.decision_reason = "missing process identifier";
+        return finding;
+    }
+
+    if (RequiresFilePath(finding.proposed_response) && finding.file_path.empty()) {
+        finding.proposed_response = ResponseAction::kObserveOnly;
+        finding.decision_reason = "missing file path";
+        return finding;
+    }
+
     if (policy_.mode == PolicyMode::kObserveOnly) {
         finding.proposed_response = ResponseAction::kObserveOnly;
         finding.decision_reason = "policy observe-only";
