@@ -35,6 +35,8 @@ from .models import (
     TaskPollRequest,
     TaskPollResponse,
     TaskRecordResponse,
+    TaskStartRequest,
+    TaskStartResponse,
     TaskResultRequest,
     TaskResultResponse,
 )
@@ -143,6 +145,24 @@ def _validate_result_timing(settings: Settings, started_at: datetime, finished_a
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="duration_mismatch",
+        )
+
+
+def _validate_start_time(started_at: datetime, task: Task) -> None:
+    if started_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_requires_timezone",
+        )
+    if started_at < task.created_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_before_created",
+        )
+    if started_at > task.expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_after_expiry",
         )
 
 
@@ -395,6 +415,79 @@ async def poll_tasks(
             )
             for task in tasks
         ],
+    )
+
+
+@app.post("/tasks/{task_id}/start", response_model=TaskStartResponse)
+async def start_task(
+    task_id: str,
+    request: Request,
+    payload: TaskStartRequest,
+    settings: Settings = Depends(get_settings),
+    signature: Optional[str] = Header(None, alias="X-Request-Signature"),
+    timestamp: Optional[str] = Header(None, alias="X-Request-Timestamp"),
+    _: None = Depends(enforce_https),
+) -> TaskStartResponse:
+    """Record the start of a task execution."""
+    _require_execution_enabled(settings)
+    _validate_scope_enabled(settings, payload.tenant_id, payload.asset_id)
+
+    if not signature or not timestamp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="missing_signature_headers",
+        )
+
+    try:
+        timestamp_int = int(timestamp)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_timestamp",
+        ) from exc
+
+    raw_body = json.dumps(payload.model_dump(), separators=(",", ":")).encode(
+        "utf-8"
+    )
+    valid, reason = verify_signature(settings, raw_body, signature, timestamp_int)
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=reason,
+        )
+
+    if payload.task_id != task_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="task_id_mismatch",
+        )
+
+    task_store.expire_overdue()
+    task = task_store.get(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="task_not_found",
+        )
+
+    if task.delivered_to_agent and task.delivered_to_agent != payload.agent_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="task_agent_mismatch",
+        )
+
+    if task.tenant_id != payload.tenant_id or task.asset_id != payload.asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="task_scope_mismatch",
+        )
+
+    _validate_start_time(payload.started_at, task)
+    task_store.mark_executing(task_id, payload.started_at)
+
+    return TaskStartResponse(
+        status="recorded",
+        recorded_at=datetime.now(timezone.utc),
     )
 
 

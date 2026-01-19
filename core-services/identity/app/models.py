@@ -150,6 +150,23 @@ class TaskPollResponse(BaseModel):
     tasks: list[TaskRecordResponse]
 
 
+class TaskStartRequest(BaseModel):
+    """Execution start event reported by the agent."""
+
+    tenant_id: str = Field(..., min_length=8, max_length=64)
+    asset_id: str = Field(..., min_length=8, max_length=64)
+    agent_id: str = Field(..., min_length=8, max_length=64)
+    task_id: str = Field(..., min_length=8, max_length=64)
+    started_at: datetime
+
+
+class TaskStartResponse(BaseModel):
+    """Response after recording task execution start."""
+
+    status: str
+    recorded_at: datetime
+
+
 class TaskResultRequest(BaseModel):
     """Execution result reported by the agent."""
 
