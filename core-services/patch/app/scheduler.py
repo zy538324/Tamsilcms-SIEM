@@ -43,6 +43,7 @@ def build_execution_plan(
         pre_check_results=[],
         post_check_results=[],
         rollback_actions=[],
+        reboot_events=[],
     )
 
 

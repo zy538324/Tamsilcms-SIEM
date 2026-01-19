@@ -15,6 +15,7 @@ creates policy-bound execution plans, and records evidence for compliance.
 - `POST /plans/{plan_id}/start`: mark a plan as executing.
 - `POST /plans/{plan_id}/checks`: record pre/post-check results.
 - `POST /plans/{plan_id}/rollback`: record rollback actions.
+- `POST /plans/{plan_id}/reboot`: record reboot lifecycle events.
 - `POST /plans/{plan_id}/results`: record execution results and verification.
 - `GET /plans/{plan_id}/tasks`: generate MVP-5 task manifest.
 - `POST /assets/block`: mark an asset as patch-blocked.

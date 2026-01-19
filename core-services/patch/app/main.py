@@ -28,6 +28,8 @@ from .models import (
     ExecutionResultResponse,
     PlanCheckRequest,
     PlanCheckResponse,
+    PlanRebootRequest,
+    PlanRebootResponse,
     PlanRollbackRequest,
     PlanRollbackResponse,
     PlanStartRequest,
@@ -380,6 +382,32 @@ async def record_plan_rollback(
     plan.rollback_actions.extend(payload.actions)
     store.update_plan(plan)
     return PlanRollbackResponse(status="recorded", plan_id=plan_id)
+
+
+@app.post("/plans/{plan_id}/reboot", response_model=PlanRebootResponse)
+async def record_plan_reboot(
+    plan_id: UUID,
+    payload: PlanRebootRequest,
+    store: PatchStore = Depends(get_store),
+    _: None = Depends(enforce_https),
+    __: None = Depends(enforce_api_key),
+) -> PlanRebootResponse:
+    """Record reboot lifecycle events for a plan."""
+    plan_data = store.get_plan(plan_id)
+    if not plan_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="plan_not_found",
+        )
+    plan = ExecutionPlan.model_validate(plan_data)
+    if plan.tenant_id != payload.tenant_id or plan.asset_id != payload.asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="plan_scope_mismatch",
+        )
+    plan.reboot_events.append(payload.event)
+    store.update_plan(plan)
+    return PlanRebootResponse(status="recorded", plan_id=plan_id)
 
 
 @app.get("/plans/{plan_id}", response_model=ExecutionPlan)

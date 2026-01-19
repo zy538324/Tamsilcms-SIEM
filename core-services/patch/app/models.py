@@ -119,6 +119,7 @@ class ExecutionPlan(BaseModel):
     pre_check_results: list[str] = Field(default_factory=list)
     post_check_results: list[str] = Field(default_factory=list)
     rollback_actions: list[str] = Field(default_factory=list)
+    reboot_events: list["RebootEvent"] = Field(default_factory=list)
 
 
 class ExecutionPlanResponse(BaseModel):
@@ -159,6 +160,24 @@ class PlanRollbackRequest(BaseModel):
 
 
 class PlanRollbackResponse(BaseModel):
+    status: Literal["recorded"]
+    plan_id: UUID
+
+
+class RebootEvent(BaseModel):
+    """Reboot event recorded during patch execution."""
+
+    stage: Literal["requested", "started", "completed"]
+    recorded_at: datetime
+
+
+class PlanRebootRequest(BaseModel):
+    tenant_id: str = Field(..., min_length=3, max_length=64)
+    asset_id: str = Field(..., min_length=3, max_length=64)
+    event: RebootEvent
+
+
+class PlanRebootResponse(BaseModel):
     status: Literal["recorded"]
     plan_id: UUID
 
