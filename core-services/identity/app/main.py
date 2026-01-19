@@ -146,6 +146,19 @@ def _validate_result_timing(settings: Settings, started_at: datetime, finished_a
         )
 
 
+def _validate_scope_enabled(settings: Settings, tenant_id: str, asset_id: str) -> None:
+    if tenant_id in settings.tasks_disabled_tenants:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="tenant_execution_disabled",
+        )
+    if asset_id in settings.tasks_disabled_assets:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="asset_execution_disabled",
+        )
+
+
 @app.get("/health", response_class=JSONResponse)
 async def health_check(settings: Settings = Depends(get_settings)) -> dict:
     """Simple health endpoint for load balancers."""
@@ -256,6 +269,7 @@ async def create_task(
 ) -> TaskCreateResponse:
     """Create a signed, immutable task for remote execution."""
     _require_execution_enabled(settings)
+    _validate_scope_enabled(settings, payload.tenant_id, payload.asset_id)
 
     if not signature or not timestamp:
         raise HTTPException(
@@ -335,6 +349,7 @@ async def poll_tasks(
 ) -> TaskPollResponse:
     """Poll for pending tasks for an asset."""
     _require_execution_enabled(settings)
+    _validate_scope_enabled(settings, payload.tenant_id, payload.asset_id)
 
     if not signature or not timestamp:
         raise HTTPException(
@@ -395,6 +410,7 @@ async def record_task_result(
 ) -> TaskResultResponse:
     """Record the outcome of a task execution."""
     _require_execution_enabled(settings)
+    _validate_scope_enabled(settings, payload.tenant_id, payload.asset_id)
 
     if not signature or not timestamp:
         raise HTTPException(
