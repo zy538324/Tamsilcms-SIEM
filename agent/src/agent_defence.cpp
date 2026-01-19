@@ -162,6 +162,12 @@ DefenceFinding DefenceModule::EvaluateSignal(const BehaviourSignal& signal) {
         ? ToIsoTimestamp(std::chrono::system_clock::now())
         : signal.observed_at;
 
+    if (finding.rule_id.empty()) {
+        finding.proposed_response = ResponseAction::kObserveOnly;
+        finding.decision_reason = "missing rule identifier";
+        return finding;
+    }
+
     if (!signal.response_defined) {
         finding.proposed_response = ResponseAction::kObserveOnly;
         finding.decision_reason = "response undefined";
