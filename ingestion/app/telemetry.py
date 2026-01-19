@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Iterable, List, Optional
 import re
 
@@ -154,6 +155,8 @@ def normalise_samples(samples: Iterable[TelemetrySample]) -> List[TelemetrySampl
         if unit != rule.unit:
             raise TelemetryValidationError("unit_mismatch")
         value = float(sample.value)
+        if not math.isfinite(value):
+            raise TelemetryValidationError("value_not_finite")
         if rule.integer_only:
             value = float(int(value))
         if rule.min_value is not None and value < rule.min_value:
