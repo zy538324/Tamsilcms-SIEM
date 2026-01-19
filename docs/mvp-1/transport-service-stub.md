@@ -14,7 +14,7 @@ cd transport
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-TRANSPORT_IDENTITY_URL="https://localhost:8080" \
+TRANSPORT_IDENTITY_URL="https://localhost:8082" \
 TRANSPORT_TRUSTED_FINGERPRINTS="sha256:examplefingerprint" \
 uvicorn app.main:app --host 0.0.0.0 --port 8081
 ```
