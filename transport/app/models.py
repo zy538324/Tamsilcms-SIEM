@@ -32,6 +32,7 @@ class InventoryBase(BaseModel):
     tenant_id: str = Field(..., min_length=8, max_length=64)
     asset_id: str = Field(..., min_length=8, max_length=64)
     collected_at: datetime
+    hostname: str | None = None
 
 
 class HardwareInventory(InventoryBase):
@@ -79,7 +80,7 @@ class LocalUsersInventory(InventoryBase):
 class LocalGroup(BaseModel):
     name: str = Field(..., min_length=1, max_length=64)
     gid: str | None = None
-    members: list[str] = []
+    members: list[str] = Field(default_factory=list)
 
 
 class LocalGroupsInventory(InventoryBase):
