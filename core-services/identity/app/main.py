@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -98,6 +98,26 @@ def _validate_output_limit(settings: Settings, value: Optional[str], field_name:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"{field_name}_too_large",
+        )
+
+
+def _validate_expiry(settings: Settings, expires_at: datetime) -> None:
+    if expires_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="expiry_requires_timezone",
+        )
+    now = datetime.now(timezone.utc)
+    if expires_at <= now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="expiry_in_past",
+        )
+    max_expiry = now + timedelta(seconds=settings.task_max_ttl_seconds)
+    if expires_at > max_expiry:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="expiry_exceeds_max_ttl",
         )
 
 
@@ -250,11 +270,7 @@ async def create_task(
 
     _validate_allowlist(settings, payload.command_payload)
 
-    if payload.expires_at <= datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="expiry_in_past",
-        )
+    _validate_expiry(settings, payload.expires_at)
 
     task = Task(
         task_id=payload.task_id,
@@ -383,6 +399,12 @@ async def record_task_result(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="invalid_result_status",
+        )
+
+    if payload.finished_at < payload.started_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_result_timing",
         )
 
     _validate_output_limit(settings, payload.stdout, "stdout")
