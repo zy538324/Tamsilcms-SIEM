@@ -155,10 +155,16 @@ async def list_assets(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
+    since: datetime | None = Query(default=None),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> list[AssetRecord]:
-    return await store.list_assets(tenant_id=tenant_id, limit=limit, offset=offset)
+    return await store.list_assets(
+        tenant_id=tenant_id,
+        limit=limit,
+        offset=offset,
+        since=since,
+    )
 
 
 @app.get("/inventory/assets/page", response_model=AssetRecordPage)
@@ -166,6 +172,7 @@ async def list_assets_page(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
+    since: datetime | None = Query(default=None),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> AssetRecordPage:
@@ -173,6 +180,7 @@ async def list_assets_page(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
+        since=since,
     )
     return AssetRecordPage(
         items=items,
@@ -187,10 +195,16 @@ async def list_asset_states(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
+    since: datetime | None = Query(default=None),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> list[AssetStateResponse]:
-    return await store.list_asset_states(tenant_id=tenant_id, limit=limit, offset=offset)
+    return await store.list_asset_states(
+        tenant_id=tenant_id,
+        limit=limit,
+        offset=offset,
+        since=since,
+    )
 
 
 @app.get("/inventory/assets/state/page", response_model=AssetStatePage)
@@ -198,6 +212,7 @@ async def list_asset_states_page(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
+    since: datetime | None = Query(default=None),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> AssetStatePage:
@@ -205,6 +220,7 @@ async def list_asset_states_page(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
+        since=since,
     )
     return AssetStatePage(
         items=items,
@@ -219,11 +235,12 @@ async def list_asset_overviews(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
+    since: datetime | None = Query(default=None),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> list[AssetInventoryOverview]:
     return await store.list_asset_overviews(
-        tenant_id=tenant_id, limit=limit, offset=offset
+        tenant_id=tenant_id, limit=limit, offset=offset, since=since
     )
 
 
@@ -232,6 +249,7 @@ async def list_asset_overview_page(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
+    since: datetime | None = Query(default=None),
     store: InventoryStore = Depends(get_store),
     _: None = Depends(enforce_https),
 ) -> AssetInventoryPage:
@@ -239,6 +257,7 @@ async def list_asset_overview_page(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
+        since=since,
     )
     return AssetInventoryPage(
         items=items,

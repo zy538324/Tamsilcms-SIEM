@@ -314,8 +314,32 @@ class InventoryStore:
         tenant_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
+        since: Optional[datetime] = None,
     ) -> List[AssetRecord]:
-        if tenant_id:
+        if tenant_id and since:
+            rows = await self.pool.fetch(
+                """
+                SELECT asset_id,
+                       tenant_id,
+                       hostname,
+                       asset_type,
+                       environment,
+                       status,
+                       criticality,
+                       last_seen_at,
+                       updated_at
+                FROM assets
+                WHERE tenant_id = $1
+                  AND last_seen_at >= $2
+                ORDER BY updated_at DESC
+                LIMIT $3 OFFSET $4
+                """,
+                tenant_id,
+                since,
+                limit,
+                offset,
+            )
+        elif tenant_id:
             rows = await self.pool.fetch(
                 """
                 SELECT asset_id,
@@ -333,6 +357,27 @@ class InventoryStore:
                 LIMIT $2 OFFSET $3
                 """,
                 tenant_id,
+                limit,
+                offset,
+            )
+        elif since:
+            rows = await self.pool.fetch(
+                """
+                SELECT asset_id,
+                       tenant_id,
+                       hostname,
+                       asset_type,
+                       environment,
+                       status,
+                       criticality,
+                       last_seen_at,
+                       updated_at
+                FROM assets
+                WHERE last_seen_at >= $1
+                ORDER BY updated_at DESC
+                LIMIT $2 OFFSET $3
+                """,
+                since,
                 limit,
                 offset,
             )
@@ -375,11 +420,28 @@ class InventoryStore:
         tenant_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
+        since: Optional[datetime] = None,
     ) -> tuple[List[AssetRecord], int]:
-        if tenant_id:
+        if tenant_id and since:
+            total = await self.pool.fetchval(
+                """
+                SELECT COUNT(*)
+                FROM assets
+                WHERE tenant_id = $1
+                  AND last_seen_at >= $2
+                """,
+                tenant_id,
+                since,
+            )
+        elif tenant_id:
             total = await self.pool.fetchval(
                 "SELECT COUNT(*) FROM assets WHERE tenant_id = $1",
                 tenant_id,
+            )
+        elif since:
+            total = await self.pool.fetchval(
+                "SELECT COUNT(*) FROM assets WHERE last_seen_at >= $1",
+                since,
             )
         else:
             total = await self.pool.fetchval("SELECT COUNT(*) FROM assets")
@@ -387,6 +449,7 @@ class InventoryStore:
             tenant_id=tenant_id,
             limit=limit,
             offset=offset,
+            since=since,
         )
         return items, int(total or 0)
 
@@ -395,6 +458,7 @@ class InventoryStore:
         tenant_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
+        since: Optional[datetime] = None,
     ) -> List[AssetStateResponse]:
         base_query = """
             SELECT a.asset_id,
@@ -418,15 +482,37 @@ class InventoryStore:
             ) u ON u.asset_id = a.asset_id
             LEFT JOIN (
                 SELECT asset_id, COUNT(*) AS group_count
-                FROM local_groups
-                GROUP BY asset_id
+                    FROM local_groups
+                    GROUP BY asset_id
             ) g ON g.asset_id = a.asset_id
         """
-        if tenant_id:
+        if tenant_id and since:
+            rows = await self.pool.fetch(
+                base_query
+                + """
+                WHERE a.tenant_id = $1
+                  AND a.last_seen_at >= $2
+                ORDER BY a.updated_at DESC
+                LIMIT $3 OFFSET $4
+                """,
+                tenant_id,
+                since,
+                limit,
+                offset,
+            )
+        elif tenant_id:
             rows = await self.pool.fetch(
                 base_query
                 + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
                 tenant_id,
+                limit,
+                offset,
+            )
+        elif since:
+            rows = await self.pool.fetch(
+                base_query
+                + " WHERE a.last_seen_at >= $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
+                since,
                 limit,
                 offset,
             )
@@ -454,11 +540,28 @@ class InventoryStore:
         tenant_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
+        since: Optional[datetime] = None,
     ) -> tuple[List[AssetStateResponse], int]:
-        if tenant_id:
+        if tenant_id and since:
+            total = await self.pool.fetchval(
+                """
+                SELECT COUNT(*)
+                FROM assets
+                WHERE tenant_id = $1
+                  AND last_seen_at >= $2
+                """,
+                tenant_id,
+                since,
+            )
+        elif tenant_id:
             total = await self.pool.fetchval(
                 "SELECT COUNT(*) FROM assets WHERE tenant_id = $1",
                 tenant_id,
+            )
+        elif since:
+            total = await self.pool.fetchval(
+                "SELECT COUNT(*) FROM assets WHERE last_seen_at >= $1",
+                since,
             )
         else:
             total = await self.pool.fetchval("SELECT COUNT(*) FROM assets")
@@ -466,6 +569,7 @@ class InventoryStore:
             tenant_id=tenant_id,
             limit=limit,
             offset=offset,
+            since=since,
         )
         return items, int(total or 0)
 
@@ -474,6 +578,7 @@ class InventoryStore:
         tenant_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
+        since: Optional[datetime] = None,
     ) -> List[AssetInventoryOverview]:
         base_query = """
             SELECT a.asset_id,
@@ -506,11 +611,33 @@ class InventoryStore:
                 GROUP BY asset_id
             ) g ON g.asset_id = a.asset_id
         """
-        if tenant_id:
+        if tenant_id and since:
+            rows = await self.pool.fetch(
+                base_query
+                + """
+                WHERE a.tenant_id = $1
+                  AND a.last_seen_at >= $2
+                ORDER BY a.updated_at DESC
+                LIMIT $3 OFFSET $4
+                """,
+                tenant_id,
+                since,
+                limit,
+                offset,
+            )
+        elif tenant_id:
             rows = await self.pool.fetch(
                 base_query
                 + " WHERE a.tenant_id = $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
                 tenant_id,
+                limit,
+                offset,
+            )
+        elif since:
+            rows = await self.pool.fetch(
+                base_query
+                + " WHERE a.last_seen_at >= $1 ORDER BY a.updated_at DESC LIMIT $2 OFFSET $3",
+                since,
                 limit,
                 offset,
             )
@@ -542,11 +669,28 @@ class InventoryStore:
         tenant_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
+        since: Optional[datetime] = None,
     ) -> tuple[List[AssetInventoryOverview], int]:
-        if tenant_id:
+        if tenant_id and since:
+            total = await self.pool.fetchval(
+                """
+                SELECT COUNT(*)
+                FROM assets
+                WHERE tenant_id = $1
+                  AND last_seen_at >= $2
+                """,
+                tenant_id,
+                since,
+            )
+        elif tenant_id:
             total = await self.pool.fetchval(
                 "SELECT COUNT(*) FROM assets WHERE tenant_id = $1",
                 tenant_id,
+            )
+        elif since:
+            total = await self.pool.fetchval(
+                "SELECT COUNT(*) FROM assets WHERE last_seen_at >= $1",
+                since,
             )
         else:
             total = await self.pool.fetchval("SELECT COUNT(*) FROM assets")
@@ -554,6 +698,7 @@ class InventoryStore:
             tenant_id=tenant_id,
             limit=limit,
             offset=offset,
+            since=since,
         )
         return items, int(total or 0)
 
