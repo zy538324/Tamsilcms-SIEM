@@ -340,6 +340,19 @@ async def ingest_events(
         ) from exc
 
     if await store.event_payload_exists(batch.payload_id):
+        await store.record_event_batch_log(
+            payload_id=batch.payload_id,
+            tenant_id=batch.tenant_id,
+            asset_id=batch.asset_id,
+            status="rejected",
+            signature=signature,
+            signature_verified=False,
+            event_count=len(batch.events),
+            accepted_count=0,
+            rejected_count=len(batch.events),
+            reject_reason="payload_replay",
+            schema_version=batch.schema_version,
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="payload_replay",
