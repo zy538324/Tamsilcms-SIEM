@@ -48,6 +48,7 @@ struct DefenceFinding {
     double confidence;
     std::string process_id;
     std::string file_path;
+    std::string command_line;
     std::string timestamp;
     ResponseAction proposed_response;
     std::string decision_reason;
@@ -77,6 +78,8 @@ struct DefencePolicy {
 };
 
 DefencePolicy BuildDefaultDefencePolicy();
+std::string BuildFindingPayload(const DefenceFinding& finding);
+std::string BuildEvidencePayload(const DefenceEvidence& evidence);
 
 class DefenceModule {
   public:

@@ -47,6 +47,56 @@ bool RequiresProcessId(ResponseAction action) {
 bool RequiresFilePath(ResponseAction action) {
     return action == ResponseAction::kQuarantineFile || action == ResponseAction::kPreventExecution;
 }
+
+std::string EscapeJsonString(const std::string& value) {
+    std::ostringstream stream;
+    for (char ch : value) {
+        switch (ch) {
+            case '\"':
+                stream << "\\\"";
+                break;
+            case '\\':
+                stream << "\\\\";
+                break;
+            case '\b':
+                stream << "\\b";
+                break;
+            case '\f':
+                stream << "\\f";
+                break;
+            case '\n':
+                stream << "\\n";
+                break;
+            case '\r':
+                stream << "\\r";
+                break;
+            case '\t':
+                stream << "\\t";
+                break;
+            default:
+                stream << ch;
+                break;
+        }
+    }
+    return stream.str();
+}
+
+std::string ResponseActionName(ResponseAction action) {
+    switch (action) {
+        case ResponseAction::kObserveOnly:
+            return "observe_only";
+        case ResponseAction::kKillProcess:
+            return "kill_process";
+        case ResponseAction::kQuarantineFile:
+            return "quarantine_file";
+        case ResponseAction::kBlockNetwork:
+            return "block_network";
+        case ResponseAction::kPreventExecution:
+            return "prevent_execution";
+        default:
+            return "unknown";
+    }
+}
 }  // namespace
 
 DefencePolicy BuildDefaultDefencePolicy() {
@@ -64,6 +114,38 @@ DefencePolicy BuildDefaultDefencePolicy() {
     return policy;
 }
 
+std::string BuildFindingPayload(const DefenceFinding& finding) {
+    std::ostringstream stream;
+    stream << "{"
+           << "\"detection_id\":\"" << EscapeJsonString(finding.detection_id) << "\","
+           << "\"rule_id\":\"" << EscapeJsonString(finding.rule_id) << "\","
+           << "\"behaviour_signature\":\"" << EscapeJsonString(finding.behaviour_signature) << "\","
+           << "\"confidence\":" << finding.confidence << ","
+           << "\"process_id\":\"" << EscapeJsonString(finding.process_id) << "\","
+           << "\"file_path\":\"" << EscapeJsonString(finding.file_path) << "\","
+           << "\"command_line\":\"" << EscapeJsonString(finding.command_line) << "\","
+           << "\"timestamp\":\"" << EscapeJsonString(finding.timestamp) << "\","
+           << "\"proposed_response\":\"" << ResponseActionName(finding.proposed_response) << "\","
+           << "\"decision_reason\":\"" << EscapeJsonString(finding.decision_reason) << "\""
+           << "}";
+    return stream.str();
+}
+
+std::string BuildEvidencePayload(const DefenceEvidence& evidence) {
+    std::ostringstream stream;
+    stream << "{"
+           << "\"finding_id\":\"" << EscapeJsonString(evidence.finding_id) << "\","
+           << "\"policy_id\":\"" << EscapeJsonString(evidence.policy_id) << "\","
+           << "\"action\":\"" << ResponseActionName(evidence.action) << "\","
+           << "\"permitted_by_policy\":" << (evidence.permitted_by_policy ? "true" : "false") << ","
+           << "\"decision_reason\":\"" << EscapeJsonString(evidence.decision_reason) << "\","
+           << "\"before_state\":\"" << EscapeJsonString(evidence.before_state) << "\","
+           << "\"after_state\":\"" << EscapeJsonString(evidence.after_state) << "\","
+           << "\"timestamp\":\"" << EscapeJsonString(evidence.timestamp) << "\""
+           << "}";
+    return stream.str();
+}
+
 DefenceModule::DefenceModule(const Config& config, DefencePolicy policy)
     : config_(config), policy_(std::move(policy)) {}
 
@@ -75,6 +157,7 @@ DefenceFinding DefenceModule::EvaluateSignal(const BehaviourSignal& signal) {
     finding.confidence = signal.confidence;
     finding.process_id = signal.process_id;
     finding.file_path = signal.file_path;
+    finding.command_line = signal.command_line;
     finding.timestamp = signal.observed_at.empty()
         ? ToIsoTimestamp(std::chrono::system_clock::now())
         : signal.observed_at;
@@ -118,6 +201,9 @@ DefenceFinding DefenceModule::EvaluateSignal(const BehaviourSignal& signal) {
     if (IsRateLimited()) {
         finding.proposed_response = ResponseAction::kObserveOnly;
         finding.decision_reason = "rate limited";
+    }
+    if (finding.decision_reason.empty()) {
+        finding.decision_reason = "action permitted";
     }
     return finding;
 }
