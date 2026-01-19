@@ -6,7 +6,9 @@ import string
 from fastapi import HTTPException, status
 
 from .config import Settings
-from .models import RuleDefinition
+from datetime import datetime, timezone
+
+from .models import EventIngestRequest, RuleDefinition
 
 
 def _extract_placeholders(template: str) -> set[str]:
@@ -45,3 +47,35 @@ def validate_rule_definition(rule: RuleDefinition, settings: Settings) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"invalid_explanation_variables:{','.join(sorted(invalid))}",
         )
+
+
+def validate_event_payload(payload: EventIngestRequest, settings: Settings) -> None:
+    """Validate event payload integrity and context alignment."""
+    event = payload.event
+    if event.received_at.tzinfo is None or event.occurred_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="event_requires_timezone",
+        )
+    if event.received_at < event.occurred_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="received_before_occurred",
+        )
+    max_age = datetime.now(timezone.utc) - event.occurred_at
+    if max_age.total_seconds() > settings.max_event_age_seconds:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="event_too_old",
+        )
+    if payload.context:
+        if payload.context.asset.asset_id != event.asset_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="context_asset_mismatch",
+            )
+        if payload.context.identity.identity_id != event.identity_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="context_identity_mismatch",
+            )

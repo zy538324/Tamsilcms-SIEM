@@ -24,7 +24,7 @@ from .models import (
 )
 from .rules import default_rules
 from .store import init_stores, store
-from .validation import validate_rule_definition
+from .validation import validate_event_payload, validate_rule_definition
 
 app = FastAPI(title="Detection & Correlation Service", version="0.1.0")
 
@@ -107,11 +107,7 @@ async def ingest_event(
     if store is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="store_unavailable")
 
-    if payload.event.received_at.tzinfo is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="received_at_requires_timezone")
-    if payload.event.occurred_at.tzinfo is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="occurred_at_requires_timezone")
-
+    validate_event_payload(payload, settings)
     store.events.add(payload.event)
     findings = evaluate_event(payload.event, payload.context, settings, store)
     return EventIngestResponse(status="processed", findings=findings)
@@ -121,13 +117,26 @@ async def ingest_event(
 async def list_findings(
     settings: Settings = Depends(get_settings),
     state: Optional[str] = None,
+    severity: Optional[str] = None,
+    asset_id: Optional[str] = None,
+    identity_id: Optional[str] = None,
+    limit: int = 50,
 ) -> FindingListResponse:
-    """List findings with optional state filter."""
+    """List findings with optional filters."""
     if store is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="store_unavailable")
     findings = store.findings.list()
     if state:
         findings = [finding for finding in findings if finding.state == state]
+    if severity:
+        findings = [finding for finding in findings if finding.severity == severity]
+    if asset_id:
+        findings = [finding for finding in findings if finding.context_snapshot.asset.asset_id == asset_id]
+    if identity_id:
+        findings = [finding for finding in findings if finding.context_snapshot.identity.identity_id == identity_id]
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="limit_out_of_range")
+    findings = findings[:limit]
     return FindingListResponse(findings=findings)
 
 
