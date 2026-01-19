@@ -252,7 +252,12 @@ CREATE TABLE tasks (
     requested_by UUID NOT NULL REFERENCES identities(identity_id),
     command TEXT NOT NULL,
     interpreter TEXT NOT NULL, -- bash, powershell
+    execution_context TEXT NOT NULL, -- system/root only for MVP-5
+    policy_reference TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'pending',
+    allow_network BOOLEAN NOT NULL DEFAULT FALSE,
     signed_payload JSONB NOT NULL,
+    signature TEXT NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -264,6 +269,10 @@ CREATE TABLE task_results (
     stdout TEXT,
     stderr TEXT,
     exit_code INTEGER,
+    started_at TIMESTAMPTZ,
+    finished_at TIMESTAMPTZ,
+    duration_ms INTEGER,
+    truncated BOOLEAN NOT NULL DEFAULT FALSE,
     executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
