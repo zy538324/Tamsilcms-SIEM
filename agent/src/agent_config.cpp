@@ -18,7 +18,7 @@ std::string GetEnv(const char* key, const std::string& fallback) {
 
 Config LoadConfig() {
     Config config{};
-    config.transport_url = GetEnv("AGENT_TRANSPORT_URL", "https://10.252.0.2:8085/ingest");
+    config.transport_url = GetEnv("AGENT_TRANSPORT_URL", "https://10.252.0.2:8085");
     config.tenant_id = GetEnv("AGENT_TENANT_ID", "");
     config.asset_id = GetEnv("AGENT_ASSET_ID", "");
     config.identity_id = GetEnv("AGENT_IDENTITY_ID", "");
