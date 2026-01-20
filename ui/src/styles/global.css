@@ -239,6 +239,39 @@ a {
   color: #ffffff;
 }
 
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.filter-bar__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 220px;
+}
+
+.text-input {
+  background: #0f1522;
+  border: 1px solid #2c3548;
+  color: #e6e9ef;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.text-input:focus {
+  outline: 2px solid rgba(46, 107, 255, 0.4);
+  outline-offset: 2px;
+}
+
+.sla-risk {
+  color: #ffbe47;
+  font-weight: 600;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
