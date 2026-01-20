@@ -351,5 +351,6 @@ const Overview = () => {
     </div>
   </section>
 );
+}
 
 export default Overview;

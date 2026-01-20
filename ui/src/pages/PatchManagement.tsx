@@ -142,7 +142,7 @@ const PatchWorkspace = () => {
             { header: "Status", accessor: (item) => item.status },
             { header: "Last Patch", accessor: (item) => item.lastPatch },
             { header: "Next Window", accessor: (item) => item.nextWindow },
-            { header: "Blocker", accessor: (item) => item.blocker ?? \"-\" }
+            { header: "Blocker", accessor: (item) => item.blocker ?? "-" }
           ]}
           rows={filteredItems}
         />

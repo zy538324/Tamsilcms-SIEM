@@ -1,6 +1,6 @@
 import { fetchCoreService, resolveTransportBaseUrl } from "./coreServices";
 
-export type DetectionFinding = {
+export interface DetectionFinding {
   finding_id: string;
   finding_type: string;
   severity: "low" | "medium" | "high" | "critical";
@@ -14,8 +14,21 @@ export type DetectionFinding = {
       hostname?: string;
       environment?: string;
       criticality?: string;
+      role?: string;
     };
+    supporting_event_count?: number;
   };
+  // UI-friendly derived/optional fields
+  confidence?: number; // percentage 0-100
+  explanation?: string;
+  asset?: {
+    asset_id: string;
+    hostname?: string;
+    environment?: string;
+    criticality?: string;
+    role?: string;
+  };
+  supporting_event_count?: number;
 };
 
 export type FindingListResponse = {
@@ -23,6 +36,7 @@ export type FindingListResponse = {
 };
 
 // Detection service feeds the SIEM and detection views.
+// Normalize server fields to UI-friendly names to avoid duplication in components.
 export const fetchFindings = async (signal?: AbortSignal): Promise<DetectionFinding[]> => {
   const baseUrl = resolveTransportBaseUrl();
   const response = await fetchCoreService<FindingListResponse>(
@@ -31,5 +45,12 @@ export const fetchFindings = async (signal?: AbortSignal): Promise<DetectionFind
     signal,
     baseUrl
   );
-  return response.findings;
+  // map to include UI-friendly fields
+  return response.findings.map((f) => ({
+    ...f,
+    confidence: typeof f.confidence_score === "number" ? Math.round(f.confidence_score * 100) : undefined,
+    explanation: f.explanation_text,
+    asset: f.context_snapshot?.asset,
+    supporting_event_count: f.context_snapshot?.supporting_event_count ?? 0
+  }));
 };
