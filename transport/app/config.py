@@ -15,6 +15,7 @@ class Settings:
     environment: str
     identity_service_url: str
     ingestion_service_url: str
+    penetration_service_url: str
     request_timeout_seconds: float
     service_name: str
     trusted_fingerprints: str
@@ -29,6 +30,9 @@ def load_settings() -> Settings:
         ),
         ingestion_service_url=os.environ.get(
             "TRANSPORT_INGESTION_URL", "https://ingestion.local"
+        ),
+        penetration_service_url=os.environ.get(
+            "TRANSPORT_PENETRATION_URL", "https://penetration.local"
         ),
         request_timeout_seconds=float(
             os.environ.get("TRANSPORT_REQUEST_TIMEOUT", "5")

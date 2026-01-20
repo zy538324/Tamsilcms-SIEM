@@ -155,6 +155,38 @@ async def _forward_event_batch(
     return response.json()
 
 
+async def _forward_penetration_get(path: str, settings: Settings) -> dict:
+    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        response = await client.get(
+            f"{settings.penetration_service_url}{path}",
+            headers={"X-Forwarded-Proto": "https"},
+        )
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.json().get("detail", "penetration_error"),
+        )
+    return response.json()
+
+
+@app.get("/penetration/tests", response_class=JSONResponse)
+async def penetration_tests(
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+) -> dict:
+    return await _forward_penetration_get("/tests", settings)
+
+
+@app.get("/penetration/tests/{test_id}", response_class=JSONResponse)
+async def penetration_test_detail(
+    test_id: str,
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(enforce_https),
+) -> dict:
+    return await _forward_penetration_get(f"/tests/{test_id}", settings)
+
+
 @app.post("/mtls/inventory/hardware", response_class=JSONResponse)
 async def mtls_inventory_hardware(
     payload: HardwareInventory,
