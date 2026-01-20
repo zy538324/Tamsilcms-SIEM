@@ -1,3 +1,98 @@
+import uuid
+from datetime import datetime
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, Boolean
+from sqlalchemy.orm import relationship
+from .db import Base
+
+def gen_uuid():
+    return str(uuid.uuid4())
+
+class Organisation(Base):
+    __tablename__ = "organisations"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    name = Column(Text, nullable=False)
+    type = Column(Text)
+    status = Column(Text, default="active")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    organisation_id = Column(String(36), ForeignKey("organisations.id"))
+    email = Column(Text, nullable=False)
+    display_name = Column(Text)
+    status = Column(Text, default="active")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Asset(Base):
+    __tablename__ = "assets"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    organisation_id = Column(String(36), ForeignKey("organisations.id"))
+    asset_type = Column(Text)
+    external_ref = Column(Text)
+    name = Column(Text)
+    status = Column(Text, default="active")
+
+class Case(Base):
+    __tablename__ = "cases"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    organisation_id = Column(String(36), ForeignKey("organisations.id"))
+    case_type = Column(Text)
+    source_system = Column(Text)
+    severity = Column(Integer, default=1)
+    status = Column(Text, default="open")
+    opened_at = Column(DateTime, default=datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
+    assets = relationship("CaseAsset", back_populates="case")
+    tasks = relationship("Task", back_populates="case")
+
+class CaseAsset(Base):
+    __tablename__ = "case_assets"
+    case_id = Column(String(36), ForeignKey("cases.id"), primary_key=True)
+    asset_id = Column(String(36), ForeignKey("assets.id"), primary_key=True)
+    case = relationship("Case", back_populates="assets")
+
+class Task(Base):
+    __tablename__ = "tasks"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    case_id = Column(String(36), ForeignKey("cases.id"))
+    assigned_to = Column(String(36), ForeignKey("users.id"), nullable=True)
+    task_type = Column(Text)
+    status = Column(Text, default="pending")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    case = relationship("Case", back_populates="tasks")
+    actions = relationship("TaskAction", back_populates="task")
+
+class TaskAction(Base):
+    __tablename__ = "task_actions"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    task_id = Column(String(36), ForeignKey("tasks.id"))
+    action_type = Column(Text)
+    description = Column(Text)
+    performed_by = Column(String(36), ForeignKey("users.id"))
+    performed_at = Column(DateTime, default=datetime.utcnow)
+    task = relationship("Task", back_populates="actions")
+
+class EvidenceItem(Base):
+    __tablename__ = "evidence_items"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    case_id = Column(String(36), ForeignKey("cases.id"))
+    evidence_type = Column(Text)
+    source_system = Column(Text)
+    hash = Column(Text)
+    stored_uri = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    actor_id = Column(String(36))
+    action = Column(Text)
+    entity_type = Column(Text)
+    entity_id = Column(String(36))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    metadata = Column(Text)
 """Pydantic models for the PSA workflow engine."""
 from __future__ import annotations
 

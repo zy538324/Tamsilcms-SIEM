@@ -1,3 +1,8 @@
+import os
+
+DATABASE_URL = os.environ.get("PSA_DATABASE_URL") or "sqlite:///./psa.db"
+
+SERVICE_NAME = "psa"
 """Configuration for the PSA workflow engine.
 
 All secrets are sourced from environment variables to avoid hard-coding.

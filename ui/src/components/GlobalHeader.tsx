@@ -6,7 +6,7 @@ const GlobalHeader = () => (
     <div className="global-header__left">
       <div className="tenant-selector" aria-label="Tenant selector">
         <span className="eyebrow">Tenant</span>
-        <strong>Palmertech Primary</strong>
+        <strong>Home Primary</strong>
       </div>
       <div className="indicator">
         <span className="eyebrow">Environment Risk</span>
@@ -20,11 +20,11 @@ const GlobalHeader = () => (
     <div className="global-header__right">
       <div className="indicator">
         <span className="eyebrow">System Health</span>
-        <strong>Platform degraded</strong>
+        <strong>Platform healthy</strong>
       </div>
       <div className="user-meta">
         <span className="eyebrow">Signed in</span>
-        <strong>Matt Palmer · Security Lead</strong>
+        <strong>Matt Palmer</strong>
       </div>
     </div>
   </header>

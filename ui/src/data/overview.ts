@@ -1,7 +1,7 @@
 export type StatusLevel = "Healthy" | "Degraded" | "At Risk";
 
 export const environmentStatus: { summary: StatusLevel; rationale: string; updatedAt: string } = {
-  summary: "Degraded",
+  summary: "Healthy",
   rationale: "Patch backlog and elevated exposure on critical assets",
   updatedAt: "09:42 UTC"
 };
