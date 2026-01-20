@@ -171,10 +171,132 @@ CREATE TRIGGER audit_prevent_mod_trig
     BEFORE UPDATE OR DELETE ON audit_log
     FOR EACH ROW EXECUTE FUNCTION psa_prevent_modification();
 
--- Optional: ensure timezone-aware timestamps and transactional integrity via foreign keys
 
--- End of PSA schema
 -- BEGIN SIEM SCHEMA
+
+-- Auditing / Compliance schema
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS compliance_frameworks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    version TEXT,
+    authority TEXT,
+    description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS compliance_controls (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    framework_id UUID NOT NULL REFERENCES compliance_frameworks(id),
+    control_code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    control_type TEXT
+);
+
+CREATE TABLE IF NOT EXISTS control_relationships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    control_id UUID NOT NULL REFERENCES compliance_controls(id),
+    related_control_id UUID NOT NULL REFERENCES compliance_controls(id),
+    relationship_type TEXT
+);
+
+CREATE TABLE IF NOT EXISTS control_applicability (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organisation_id UUID NOT NULL,
+    control_id UUID NOT NULL REFERENCES compliance_controls(id),
+    applicable BOOLEAN DEFAULT TRUE,
+    justification TEXT,
+    decided_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS control_assessments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organisation_id UUID NOT NULL,
+    control_id UUID NOT NULL REFERENCES compliance_controls(id),
+    assessment_status TEXT,
+    effectiveness TEXT,
+    assessed_by UUID,
+    assessed_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS control_evidence (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    control_id UUID NOT NULL REFERENCES compliance_controls(id),
+    evidence_type TEXT,
+    source_system TEXT,
+    storage_uri TEXT,
+    hash TEXT,
+    valid_from TIMESTAMP WITH TIME ZONE,
+    valid_to TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE IF NOT EXISTS evidence_sources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    evidence_id UUID NOT NULL REFERENCES control_evidence(id),
+    originating_entity TEXT,
+    originating_id UUID
+);
+
+CREATE TABLE IF NOT EXISTS control_gaps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    control_id UUID NOT NULL REFERENCES compliance_controls(id),
+    organisation_id UUID NOT NULL,
+    gap_description TEXT,
+    severity INTEGER,
+    identified_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS gap_cases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    gap_id UUID NOT NULL REFERENCES control_gaps(id),
+    psa_case_id UUID
+);
+
+CREATE TABLE IF NOT EXISTS control_attestations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    control_id UUID NOT NULL REFERENCES compliance_controls(id),
+    organisation_id UUID NOT NULL,
+    attested_by UUID,
+    role TEXT,
+    statement TEXT,
+    attested_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS audit_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organisation_id UUID NOT NULL,
+    framework_id UUID REFERENCES compliance_frameworks(id),
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    completed_at TIMESTAMP WITH TIME ZONE,
+    status TEXT
+);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    audit_session_id UUID NOT NULL REFERENCES audit_sessions(id),
+    event_type TEXT,
+    actor_id UUID,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    metadata JSONB
+);
+
+-- Make evidence and audit_events append-only as a best-effort guard
+CREATE OR REPLACE FUNCTION prevent_update_on_append_only() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'This table is append-only';
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER control_evidence_no_update BEFORE UPDATE ON control_evidence
+FOR EACH ROW EXECUTE PROCEDURE prevent_update_on_append_only();
+
+CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events
+FOR EACH ROW EXECUTE PROCEDURE prevent_update_on_append_only();
+
+COMMIT;
 
 -- Raw events (append-only)
 CREATE TABLE IF NOT EXISTS raw_events (
@@ -629,6 +751,138 @@ CREATE TRIGGER vulnerability_evidence_prevent_mod_trig
     FOR EACH ROW EXECUTE FUNCTION psa_prevent_modification();
 
 -- END VULNERABILITY MANAGEMENT SCHEMA
+
+
+
+-- BEGIN RMM SCHEMA
+
+CREATE TABLE IF NOT EXISTS configuration_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    profile_type TEXT,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS configuration_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    profile_id UUID NOT NULL REFERENCES configuration_profiles(id),
+    config_key TEXT NOT NULL,
+    desired_value TEXT,
+    enforcement_mode TEXT
+);
+
+CREATE TABLE IF NOT EXISTS asset_configuration_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    asset_id UUID NOT NULL,
+    profile_id UUID NOT NULL REFERENCES configuration_profiles(id),
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS patch_catalog (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor TEXT,
+    product TEXT,
+    patch_id TEXT,
+    release_date TIMESTAMPTZ,
+    severity INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS asset_patches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    asset_id UUID NOT NULL,
+    patch_id UUID NOT NULL REFERENCES patch_catalog(id),
+    status TEXT,
+    detected_at TIMESTAMPTZ,
+    installed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS patch_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    psa_case_id UUID,
+    scheduled_for TIMESTAMPTZ,
+    reboot_policy TEXT,
+    status TEXT
+);
+
+CREATE TABLE IF NOT EXISTS scripts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT,
+    language TEXT,
+    content TEXT,
+    requires_approval BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS script_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    script_id UUID REFERENCES scripts(id),
+    asset_id UUID,
+    psa_task_id UUID,
+    status TEXT,
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS script_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id UUID NOT NULL REFERENCES script_jobs(id),
+    stdout TEXT,
+    stderr TEXT,
+    exit_code INTEGER,
+    hash TEXT
+);
+
+CREATE TABLE IF NOT EXISTS software_packages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT,
+    version TEXT,
+    installer_uri TEXT,
+    hash TEXT
+);
+
+CREATE TABLE IF NOT EXISTS deployment_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    package_id UUID REFERENCES software_packages(id),
+    asset_id UUID,
+    psa_case_id UUID,
+    status TEXT,
+    executed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS remote_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    asset_id UUID,
+    initiated_by UUID,
+    session_type TEXT,
+    started_at TIMESTAMPTZ,
+    ended_at TIMESTAMPTZ,
+    recorded BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS rmm_evidence (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    asset_id UUID,
+    evidence_type TEXT,
+    related_entity TEXT,
+    related_id UUID,
+    storage_uri TEXT,
+    hash TEXT,
+    captured_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Append-only guards for evidence and script results
+DROP TRIGGER IF EXISTS rmm_evidence_prevent_mod_trig ON rmm_evidence;
+CREATE TRIGGER rmm_evidence_prevent_mod_trig
+    BEFORE UPDATE OR DELETE ON rmm_evidence
+    FOR EACH ROW EXECUTE FUNCTION psa_prevent_modification();
+
+DROP TRIGGER IF EXISTS script_results_prevent_mod_trig ON script_results;
+CREATE TRIGGER script_results_prevent_mod_trig
+    BEFORE UPDATE OR DELETE ON script_results
+    FOR EACH ROW EXECUTE FUNCTION psa_prevent_modification();
+
+-- END RMM SCHEMA
 
 
 
