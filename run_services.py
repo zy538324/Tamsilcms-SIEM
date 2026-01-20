@@ -41,6 +41,7 @@ SERVICES: Dict[str, Dict] = {
         "port": 8081,
         "env": {
             "TRANSPORT_IDENTITY_URL": "http://localhost:8085",
+            "TRANSPORT_PENETRATION_URL": "http://localhost:8083",
             "TRANSPORT_TRUSTED_FINGERPRINTS": "sha256:examplefingerprint",
         },
     },
@@ -57,6 +58,13 @@ SERVICES: Dict[str, Dict] = {
         "port": 8082,
         "env": {
             "PATCH_API_KEY": "devkey",
+        },
+    },
+    "penetration": {
+        "path": ROOT / "core-services" / "penetration",
+        "port": 8083,
+        "env": {
+            "PENETRATION_API_KEY": "devkey",
         },
     },
 }
@@ -249,7 +257,13 @@ async def main_async(services: list[str], reload: bool) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run multiple services for local development")
-    parser.add_argument("--services", "-s", nargs="+", default=["identity", "transport", "ingestion"], help="Services to run")
+    parser.add_argument(
+        "--services",
+        "-s",
+        nargs="+",
+        default=["identity", "transport", "ingestion", "penetration"],
+        help="Services to run",
+    )
     parser.add_argument("--no-reload", action="store_true", help="Disable uvicorn --reload")
     args = parser.parse_args()
 
