@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import MetricCard from "../components/MetricCard";
 import SectionHeader from "../components/SectionHeader";
 import StatusPill from "../components/StatusPill";
@@ -89,9 +90,16 @@ const Overview = () => (
         <ul className="list">
           {findingsSummary.map((finding) => (
             <li key={`${finding.category}-${finding.confidence}`}>
-              <strong>{finding.category}</strong>
-              <span>{finding.confidence} confidence</span>
-              <span className="badge">{finding.count}</span>
+              <div>
+                <strong>{finding.category}</strong>
+                <p>{finding.confidence} confidence</p>
+              </div>
+              <div className="list__meta">
+                <span className="badge">{finding.count}</span>
+                <Link className="text-link" to="/detection-edr">
+                  View detections
+                </Link>
+              </div>
             </li>
           ))}
         </ul>
@@ -156,6 +164,9 @@ const Overview = () => (
               <div className="list__meta">
                 <span>{item.status}</span>
                 <span className="badge badge--warning">{item.slaHours}h SLA</span>
+                <Link className="text-link" to={`/psa-workflows/${item.id}`}>
+                  View ticket
+                </Link>
               </div>
             </li>
           ))}
@@ -176,7 +187,12 @@ const Overview = () => (
                 <strong>{item.framework}</strong>
                 <p>{item.drift}</p>
               </div>
-              <span className="badge">Audit {item.nextAudit}</span>
+              <div className="list__meta">
+                <span className="badge">Audit {item.nextAudit}</span>
+                <Link className="text-link" to="/compliance-audit">
+                  View controls
+                </Link>
+              </div>
             </li>
           ))}
         </ul>

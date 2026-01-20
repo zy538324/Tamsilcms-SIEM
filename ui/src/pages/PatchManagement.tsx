@@ -103,7 +103,14 @@ const PatchWorkspace = () => {
         <DataTable
           caption="Patch compliance by asset"
           columns={[
-            { header: "Patch ID", accessor: (item) => item.id },
+            {
+              header: "Patch ID",
+              accessor: (item) => (
+                <Link className="text-link" to={`/patch-management/${item.id}`}>
+                  {item.id}
+                </Link>
+              )
+            },
             { header: "Asset", accessor: (item) => item.asset },
             { header: "Ring", accessor: (item) => item.ring },
             { header: "Status", accessor: (item) => item.status },

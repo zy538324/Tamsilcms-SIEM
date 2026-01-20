@@ -104,7 +104,14 @@ const PsaWorkspace = () => {
         <DataTable
           caption="Evidence-backed tickets"
           columns={[
-            { header: "Ticket", accessor: (ticket) => ticket.id },
+            {
+              header: "Ticket",
+              accessor: (ticket) => (
+                <Link className="text-link" to={`/psa-workflows/${ticket.id}`}>
+                  {ticket.id}
+                </Link>
+              )
+            },
             { header: "Title", accessor: (ticket) => ticket.title },
             { header: "Owner", accessor: (ticket) => ticket.owner },
             { header: "Priority", accessor: (ticket) => ticket.priority },
@@ -158,8 +165,8 @@ const PsaWorkspace = () => {
                     <strong>{ticket.id}</strong>
                     <p>{ticket.title}</p>
                   </div>
-                  <Link className="text-link" to={`/assets/${ticket.linkedAsset}`}>
-                    View asset
+                  <Link className="text-link" to={`/psa-workflows/${ticket.id}`}>
+                    View ticket
                   </Link>
                 </li>
               ))}

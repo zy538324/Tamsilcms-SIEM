@@ -9,9 +9,12 @@ import DetectionEdr from "./pages/DetectionEdr";
 import Vulnerabilities from "./pages/Vulnerabilities";
 import PatchManagement from "./pages/PatchManagement";
 import PenetrationTesting from "./pages/PenetrationTesting";
+import PenTestDetail from "./pages/PenTestDetail";
 import PsaWorkflows from "./pages/PsaWorkflows";
+import PsaTicketDetail from "./pages/PsaTicketDetail";
 import ComplianceAudit from "./pages/ComplianceAudit";
 import Administration from "./pages/Administration";
+import PatchDetail from "./pages/PatchDetail";
 
 const App = () => (
   <Routes>
@@ -25,8 +28,11 @@ const App = () => (
       <Route path="/detection-edr" element={<DetectionEdr />} />
       <Route path="/vulnerabilities" element={<Vulnerabilities />} />
       <Route path="/patch-management" element={<PatchManagement />} />
+      <Route path="/patch-management/:patchId" element={<PatchDetail />} />
       <Route path="/penetration-testing" element={<PenetrationTesting />} />
+      <Route path="/penetration-testing/:testId" element={<PenTestDetail />} />
       <Route path="/psa-workflows" element={<PsaWorkflows />} />
+      <Route path="/psa-workflows/:ticketId" element={<PsaTicketDetail />} />
       <Route path="/compliance-audit" element={<ComplianceAudit />} />
       <Route path="/administration" element={<Administration />} />
     </Route>

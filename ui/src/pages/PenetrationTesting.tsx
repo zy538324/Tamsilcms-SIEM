@@ -122,7 +122,14 @@ const PenetrationWorkspace = () => {
         <DataTable
           caption="Penetration tests"
           columns={[
-            { header: "Test ID", accessor: (test) => test.id },
+            {
+              header: "Test ID",
+              accessor: (test) => (
+                <Link className="text-link" to={`/penetration-testing/${test.id}`}>
+                  {test.id}
+                </Link>
+              )
+            },
             { header: "Name", accessor: (test) => test.name },
             { header: "Type", accessor: (test) => test.testType },
             { header: "Method", accessor: (test) => test.method },
