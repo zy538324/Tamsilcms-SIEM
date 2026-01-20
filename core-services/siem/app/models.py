@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON, Text, Boolean, ARRAY
-from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
+from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON, Text, Boolean
 from sqlalchemy.orm import relationship
 from .db import Base
 
@@ -25,7 +24,7 @@ class Event(Base):
     event_category = Column(Text)
     event_type = Column(Text)
     severity = Column(Integer, default=1)
-    asset_id = Column(String(36), ForeignKey("assets.id"))
+    asset_id = Column(String(36))
     user_id = Column(String(36), nullable=True)
     source_ip = Column(Text)
     destination_ip = Column(Text)
@@ -59,13 +58,13 @@ class CorrelationHit(Base):
     id = Column(String(36), primary_key=True, default=gen_uuid)
     rule_id = Column(String(36), ForeignKey("correlation_rules.id"))
     triggered_at = Column(DateTime, default=datetime.utcnow)
-    event_ids = Column(ARRAY(String))
+    event_ids = Column(JSON, default=list)
     confidence = Column(Integer, default=50)
 
 class SiemFinding(Base):
     __tablename__ = "siem_findings"
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    organisation_id = Column(String(36), ForeignKey("organisations.id"))
+    organisation_id = Column(String(36))
     finding_type = Column(Text)
     severity = Column(Integer, default=1)
     confidence = Column(Integer, default=50)

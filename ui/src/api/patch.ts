@@ -1,4 +1,4 @@
-import { fetchCoreService, resolveTransportBaseUrl } from "./coreServices";
+import { fetchCoreService } from "./coreServices";
 
 export type ComplianceSummaryResponse = {
   tenant_id: string;
@@ -20,24 +20,12 @@ export const fetchComplianceSummary = async (
   tenantId: string,
   signal?: AbortSignal
 ): Promise<ComplianceSummaryResponse> => {
-  const baseUrl = resolveTransportBaseUrl();
-  return fetchCoreService<ComplianceSummaryResponse>(
-    "patch",
-    `/compliance/${encodeURIComponent(tenantId)}`,
-    signal,
-    baseUrl
-  );
+  return fetchCoreService<ComplianceSummaryResponse>("patch", `/compliance/${encodeURIComponent(tenantId)}`, signal);
 };
 
 export const fetchAssetPatchState = async (
   assetId: string,
   signal?: AbortSignal
 ): Promise<AssetPatchStateResponse> => {
-  const baseUrl = resolveTransportBaseUrl();
-  return fetchCoreService<AssetPatchStateResponse>(
-    "patch",
-    `/assets/${encodeURIComponent(assetId)}/state`,
-    signal,
-    baseUrl
-  );
+  return fetchCoreService<AssetPatchStateResponse>("patch", `/assets/${encodeURIComponent(assetId)}/state`, signal);
 };

@@ -1,4 +1,4 @@
-import { fetchCoreService, resolveTransportBaseUrl } from "./coreServices";
+import { fetchCoreService } from "./coreServices";
 
 export type PenTestApiResponse = {
   tests: Array<{
@@ -12,8 +12,7 @@ export type PenTestApiResponse = {
 };
 
 export const fetchPenTests = async (signal?: AbortSignal): Promise<PenTestApiResponse> => {
-  const baseUrl = resolveTransportBaseUrl();
-  return fetchCoreService<PenTestApiResponse>("penetration", "/tests", signal, baseUrl);
+  return fetchCoreService<PenTestApiResponse>("pentest", "/tests", signal);
 };
 
 export type PenTestDetailResponse = {
@@ -36,11 +35,5 @@ export const fetchPenTest = async (
   testId: string,
   signal?: AbortSignal
 ): Promise<PenTestDetailResponse> => {
-  const baseUrl = resolveTransportBaseUrl();
-  return fetchCoreService<PenTestDetailResponse>(
-    "penetration",
-    `/tests/${encodeURIComponent(testId)}`,
-    signal,
-    baseUrl
-  );
+  return fetchCoreService<PenTestDetailResponse>("pentest", `/tests/${encodeURIComponent(testId)}`, signal);
 };

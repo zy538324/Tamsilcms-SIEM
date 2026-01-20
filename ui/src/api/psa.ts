@@ -1,4 +1,4 @@
-import { fetchCoreService, resolveTransportBaseUrl } from "./coreServices";
+import { fetchCoreService } from "./coreServices";
 
 export type PsaTicketRecord = {
   ticket_id: string;
@@ -23,23 +23,11 @@ export type TicketResponse = {
 
 // PSA workflow service for ticketed actions and evidence linkage.
 export const fetchTickets = async (signal?: AbortSignal): Promise<PsaTicketRecord[]> => {
-  const baseUrl = resolveTransportBaseUrl();
-  const response = await fetchCoreService<TicketListResponse>(
-    "psa",
-    "/tickets",
-    signal,
-    baseUrl
-  );
-  return response.tickets;
+  const response = await fetchCoreService<TicketListResponse>("psa", "/cases", signal);
+  return response.tickets ?? response.cases ?? [];
 };
 
 export const fetchTicket = async (ticketId: string, signal?: AbortSignal): Promise<PsaTicketRecord> => {
-  const baseUrl = resolveTransportBaseUrl();
-  const response = await fetchCoreService<TicketResponse>(
-    "psa",
-    `/tickets/${encodeURIComponent(ticketId)}`,
-    signal,
-    baseUrl
-  );
-  return response.ticket;
+  const response = await fetchCoreService<TicketResponse>("psa", `/cases/${encodeURIComponent(ticketId)}`, signal);
+  return response.ticket ?? response.case ?? (response as any);
 };

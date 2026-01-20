@@ -1,16 +1,15 @@
-import os
+from __future__ import annotations
 
-DATABASE_URL = os.environ.get("PSA_DATABASE_URL") or "sqlite:///./psa.db"
+import os
+from dataclasses import dataclass
+
+DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("PSA_DATABASE_URL") or "sqlite:///./psa.db"
 
 SERVICE_NAME = "psa"
 """Configuration for the PSA workflow engine.
 
 All secrets are sourced from environment variables to avoid hard-coding.
 """
-from __future__ import annotations
-
-import os
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

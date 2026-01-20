@@ -172,6 +172,14 @@ async def run_service(name: str, cfg: Dict, reload: bool) -> asyncio.subprocess.
     for k, v in cfg.get("env", {}).items():
         env.setdefault(k, v)
 
+    # Ensure subprocesses can import repo-level packages by adding project root to PYTHONPATH
+    root_path = str(ROOT)
+    existing_pp = env.get("PYTHONPATH")
+    if existing_pp:
+        env["PYTHONPATH"] = root_path + os.pathsep + existing_pp
+    else:
+        env["PYTHONPATH"] = root_path
+
     python_exe = find_venv_python(service_path) or sys.executable
 
     host = os.environ.get(f"{name.upper()}_HOST", "127.0.0.1")

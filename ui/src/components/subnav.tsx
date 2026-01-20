@@ -1,8 +1,8 @@
 import { NavLink } from "react-router-dom";
-import type { NavItem } from "../data/navigation";
+import type { SubNavItem } from "../data/subnav";
 
 type SubNavProps = {
-  items: NavItem[];
+  items: SubNavItem[];
 };
 
 const SubNav = ({ items }: SubNavProps) => (

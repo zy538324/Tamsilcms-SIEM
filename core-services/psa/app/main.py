@@ -1,19 +1,3 @@
-from fastapi import FastAPI
-from .api import router as psa_router
-from .db import init_db
-
-app = FastAPI(title="PSA Service")
-app.include_router(psa_router, prefix="/psa")
-
-
-@app.on_event("startup")
-def startup_event():
-    init_db()
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
 """PSA workflow engine entry point (MVP-11)."""
 from __future__ import annotations
 

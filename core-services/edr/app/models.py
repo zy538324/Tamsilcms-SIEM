@@ -10,7 +10,7 @@ def gen_uuid():
 class ProcessEvent(Base):
     __tablename__ = "process_events"
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    asset_id = Column(String(36), ForeignKey("assets.id"))
+    asset_id = Column(String(36))
     process_id = Column(Integer)
     parent_process_id = Column(Integer)
     image_path = Column(Text)
@@ -22,7 +22,7 @@ class ProcessEvent(Base):
 class FileEvent(Base):
     __tablename__ = "file_events"
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    asset_id = Column(String(36), ForeignKey("assets.id"))
+    asset_id = Column(String(36))
     process_event_id = Column(String(36), ForeignKey("process_events.id"))
     file_path = Column(Text)
     action = Column(Text)
@@ -32,7 +32,7 @@ class FileEvent(Base):
 class NetworkEvent(Base):
     __tablename__ = "network_events"
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    asset_id = Column(String(36), ForeignKey("assets.id"))
+    asset_id = Column(String(36))
     process_event_id = Column(String(36), ForeignKey("process_events.id"))
     local_ip = Column(Text)
     remote_ip = Column(Text)
@@ -52,7 +52,7 @@ class EdrRule(Base):
 class EdrDetection(Base):
     __tablename__ = "edr_detections"
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    asset_id = Column(String(36), ForeignKey("assets.id"))
+    asset_id = Column(String(36))
     detection_type = Column(Text)
     severity = Column(Integer, default=1)
     confidence = Column(Integer, default=50)
@@ -79,7 +79,7 @@ class ResponseAction(Base):
 
 class EndpointIsolation(Base):
     __tablename__ = "endpoint_isolation_state"
-    asset_id = Column(String(36), ForeignKey("assets.id"), primary_key=True)
+    asset_id = Column(String(36), primary_key=True)
     isolated = Column(Integer, default=0)
     reason = Column(Text)
     since = Column(DateTime, default=datetime.utcnow)

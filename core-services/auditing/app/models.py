@@ -110,4 +110,4 @@ class AuditEvent(Base):
     event_type = Column(String)
     actor_id = Column(String)
     timestamp = Column(TIMESTAMP(timezone=True), server_default=func.now())
-    metadata = Column(JSON)
+    event_metadata = Column(JSON)

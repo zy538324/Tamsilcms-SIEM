@@ -1,4 +1,4 @@
-import { fetchCoreService, resolveTransportBaseUrl } from "./coreServices";
+import { fetchCoreService } from "./coreServices";
 
 export interface DetectionFinding {
   finding_id: string;
@@ -38,13 +38,7 @@ export type FindingListResponse = {
 // Detection service feeds the SIEM and detection views.
 // Normalize server fields to UI-friendly names to avoid duplication in components.
 export const fetchFindings = async (signal?: AbortSignal): Promise<DetectionFinding[]> => {
-  const baseUrl = resolveTransportBaseUrl();
-  const response = await fetchCoreService<FindingListResponse>(
-    "detection",
-    "/findings?limit=100",
-    signal,
-    baseUrl
-  );
+  const response = await fetchCoreService<FindingListResponse>("siem", "/findings?limit=100", signal);
   // map to include UI-friendly fields
   return response.findings.map((f) => ({
     ...f,

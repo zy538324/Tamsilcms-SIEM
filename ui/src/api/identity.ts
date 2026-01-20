@@ -1,4 +1,4 @@
-import { fetchCoreService, resolveTransportBaseUrl } from "./coreServices";
+import { fetchCoreService } from "./coreServices";
 
 export type AgentResponse = {
   identity_id: string;
@@ -35,21 +35,17 @@ export type RiskScoreResponse = {
 
 // Identity endpoints provide the asset/agent inventory and telemetry signals.
 export const fetchAgents = async (signal?: AbortSignal): Promise<AgentResponse[]> => {
-  const baseUrl = resolveTransportBaseUrl();
-  return fetchCoreService<AgentResponse[]>("identity", "/agents", signal, baseUrl);
+  return fetchCoreService<AgentResponse[]>("identity", "/agents", signal);
 };
 
 export const fetchAgentPresence = async (signal?: AbortSignal): Promise<AgentPresenceResponse[]> => {
-  const baseUrl = resolveTransportBaseUrl();
-  return fetchCoreService<AgentPresenceResponse[]>("identity", "/agents/presence", signal, baseUrl);
+  return fetchCoreService<AgentPresenceResponse[]>("identity", "/agents/presence", signal);
 };
 
 export const fetchHeartbeats = async (signal?: AbortSignal): Promise<HeartbeatEventResponse[]> => {
-  const baseUrl = resolveTransportBaseUrl();
-  return fetchCoreService<HeartbeatEventResponse[]>("identity", "/heartbeats", signal, baseUrl);
+  return fetchCoreService<HeartbeatEventResponse[]>("identity", "/heartbeats", signal);
 };
 
 export const fetchRiskScores = async (signal?: AbortSignal): Promise<RiskScoreResponse[]> => {
-  const baseUrl = resolveTransportBaseUrl();
-  return fetchCoreService<RiskScoreResponse[]>("identity", "/risk-scores", signal, baseUrl);
+  return fetchCoreService<RiskScoreResponse[]>("identity", "/risk-scores", signal);
 };

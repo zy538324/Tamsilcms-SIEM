@@ -1,7 +1,14 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from .models import CorrelationRule, Event, CorrelationHit, SiemFinding, FindingEvent, EvidencePackage, Escalation
-from core_services.common.escalation import EscalationClient
+from typing import Protocol, Any, Dict
+
+# Define a minimal protocol for the external EscalationClient so this module
+# doesn't require the external package to be importable in all environments.
+class EscalationClient(Protocol):
+    def create_case(self, organisation_id: str, case_type: str, source_system: str, severity: int) -> Dict[str, Any]:
+        ...
+
 import json
 
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, Boolean
@@ -92,9 +94,8 @@ class AuditLog(Base):
     entity_type = Column(Text)
     entity_id = Column(String(36))
     timestamp = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(Text)
+    event_metadata = Column(Text)
 """Pydantic models for the PSA workflow engine."""
-from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal, Optional
