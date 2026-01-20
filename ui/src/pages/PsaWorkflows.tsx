@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 
 const PsaWorkflows = () => (
@@ -9,9 +10,9 @@ const PsaWorkflows = () => (
           Human accountability with evidence-backed ticketing and approvals.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/psa-workflows">
         View approval queue
-      </button>
+      </Link>
     </header>
 
     <div className="grid grid--two">

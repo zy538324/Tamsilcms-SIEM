@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 import { assetDetails, assets } from "../data/assets";
 
@@ -25,9 +25,9 @@ const AssetDetail = () => {
           <h1>{asset.name}</h1>
           <p className="page__subtitle">{asset.role} · {asset.criticality} criticality</p>
         </div>
-        <button className="ghost-button" type="button">
+        <Link className="ghost-button" to="/siem">
           Request full evidence bundle
-        </button>
+        </Link>
       </header>
 
       <div className="grid grid--two">
@@ -94,6 +94,7 @@ const AssetDetail = () => {
             title="Findings"
             description="Evidence-led detections with traceability."
             actionLabel="Open detection workspace"
+            actionPath="/detection-edr"
           />
           <ul className="list">
             {detail.findings.map((finding) => (
@@ -109,6 +110,7 @@ const AssetDetail = () => {
             title="Vulnerabilities"
             description="Exposure and exploitability in plain view."
             actionLabel="View remediation guidance"
+            actionPath="/vulnerabilities"
           />
           <ul className="list">
             {detail.vulnerabilities.map((item) => (
@@ -123,9 +125,9 @@ const AssetDetail = () => {
             description="Policy-driven maintenance context."
           />
           <p>{detail.patchState}</p>
-          <button className="ghost-button" type="button">
+          <Link className="ghost-button" to="/patch-management">
             View maintenance window
-          </button>
+          </Link>
         </section>
 
         <section className="card">

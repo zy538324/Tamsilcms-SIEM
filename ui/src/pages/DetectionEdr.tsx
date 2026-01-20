@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 
 const DetectionEdr = () => (
@@ -9,9 +10,9 @@ const DetectionEdr = () => (
           Judgement and defence with explanations always visible.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/detection-edr">
         Review false positives
-      </button>
+      </Link>
     </header>
 
     <div className="grid grid--two">

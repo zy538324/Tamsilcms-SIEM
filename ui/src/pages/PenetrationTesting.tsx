@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 
 const PenetrationTesting = () => (
@@ -9,9 +10,9 @@ const PenetrationTesting = () => (
           Validation and humility focused on what failed to detect or stop.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/penetration-testing">
         Schedule test
-      </button>
+      </Link>
     </header>
 
     <div className="grid grid--two">

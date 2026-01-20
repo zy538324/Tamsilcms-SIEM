@@ -60,6 +60,7 @@ const Overview = () => (
           title="Asset posture summary"
           description="Health of assets across criticality bands, with action paths into assets."
           actionLabel="View assets"
+          actionPath="/assets"
         />
         <div className="stat-stack">
           <div>
@@ -83,6 +84,7 @@ const Overview = () => (
           title="Active findings summary"
           description="Confidence and category split of live detections."
           actionLabel="Open detections"
+          actionPath="/detection-edr"
         />
         <ul className="list">
           {findingsSummary.map((finding) => (
@@ -100,6 +102,7 @@ const Overview = () => (
           title="Vulnerability exposure trend"
           description="Exposure-focused view to avoid CVE count distortion."
           actionLabel="View vulnerabilities"
+          actionPath="/vulnerabilities"
         />
         <div className="trend">
           {exposureTrend.map((point) => (
@@ -116,6 +119,7 @@ const Overview = () => (
           title="Patch compliance status"
           description="Policy-driven schedules and blockers with no emergency buttons."
           actionLabel="Review patching"
+          actionPath="/patch-management"
         />
         <div className="stat-stack">
           <div>
@@ -140,6 +144,7 @@ const Overview = () => (
           title="Open PSA items"
           description="SLA pressure and decision queues grounded in evidence."
           actionLabel="Open workflow queue"
+          actionPath="/psa-workflows"
         />
         <ul className="list">
           {psaItems.map((item) => (
@@ -162,6 +167,7 @@ const Overview = () => (
           title="Compliance drift indicators"
           description="Evidence-focused drift showing where proof is missing."
           actionLabel="Review compliance"
+          actionPath="/compliance-audit"
         />
         <ul className="list">
           {complianceDrift.map((item) => (

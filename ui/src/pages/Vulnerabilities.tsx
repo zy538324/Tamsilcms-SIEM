@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 
 const Vulnerabilities = () => (
@@ -9,9 +10,9 @@ const Vulnerabilities = () => (
           Exposure awareness with exploitability foregrounded. CVE counts are secondary.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/vulnerabilities">
         Review risk acceptances
-      </button>
+      </Link>
     </header>
 
     <div className="grid grid--two">

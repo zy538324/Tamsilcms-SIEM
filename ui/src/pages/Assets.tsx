@@ -13,9 +13,9 @@ const Assets = () => (
           evidence, health telemetry, and accountability.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/psa-workflows">
         Request asset report
-      </button>
+      </Link>
     </header>
 
     <section className="card">

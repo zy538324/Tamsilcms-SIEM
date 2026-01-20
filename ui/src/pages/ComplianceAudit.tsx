@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 
 const ComplianceAudit = () => (
@@ -9,9 +10,9 @@ const ComplianceAudit = () => (
           Proof and evidence with drift visibility and audit-ready bundles.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/compliance-audit">
         Generate audit bundle
-      </button>
+      </Link>
     </header>
 
     <div className="grid grid--two">

@@ -229,6 +229,9 @@ a {
   border-radius: 999px;
   cursor: pointer;
   font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .ghost-button:hover {

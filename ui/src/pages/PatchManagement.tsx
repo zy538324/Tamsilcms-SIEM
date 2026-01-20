@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 
 const PatchManagement = () => (
@@ -9,9 +10,9 @@ const PatchManagement = () => (
           Controlled change with policy-driven scheduling and clear blockers.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/patch-management">
         View patch policy
-      </button>
+      </Link>
     </header>
 
     <div className="grid grid--two">

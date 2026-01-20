@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 
 const Siem = () => (
@@ -9,9 +10,9 @@ const Siem = () => (
           Investigation and memory focused on reconstruction, not reaction.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/siem">
         Export evidence
-      </button>
+      </Link>
     </header>
 
     <div className="grid grid--two">

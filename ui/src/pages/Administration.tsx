@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SectionHeader from "../components/SectionHeader";
 
 const Administration = () => (
@@ -9,9 +10,9 @@ const Administration = () => (
           Platform configuration, identity, RBAC, and tenant controls.
         </p>
       </div>
-      <button className="ghost-button" type="button">
+      <Link className="ghost-button" to="/administration">
         Manage roles
-      </button>
+      </Link>
     </header>
 
     <div className="grid grid--two">
