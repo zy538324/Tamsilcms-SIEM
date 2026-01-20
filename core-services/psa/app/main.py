@@ -161,6 +161,7 @@ async def intake_ticket(
         )
         store.record_ticket(ticket)
 
+    existing_hashes = store.list_evidence_hashes(ticket.ticket_id)
     for evidence in payload.evidence:
         evidence_payload = {
             "linked_object_type": evidence.linked_object_type,
@@ -168,17 +169,21 @@ async def intake_ticket(
             "immutable_reference": evidence.immutable_reference,
             "payload": evidence.payload or {},
         }
+        evidence_hash = build_hash(evidence_payload)
+        if evidence_hash in existing_hashes:
+            continue
         store.record_evidence(
             EvidenceRecord(
                 ticket_id=ticket.ticket_id,
                 linked_object_type=evidence.linked_object_type,
                 linked_object_id=evidence.linked_object_id,
                 immutable_reference=evidence.immutable_reference,
-                hash_sha256=build_hash(evidence_payload),
+                hash_sha256=evidence_hash,
                 captured_at=now,
                 payload=evidence.payload,
             )
         )
+        existing_hashes.add(evidence_hash)
     store.trim_evidence(ticket.ticket_id, settings.max_evidence_per_ticket)
 
     return IntakeResponse(status="recorded", ticket_id=ticket.ticket_id)
@@ -289,6 +294,7 @@ async def record_action(
         ticket_id=ticket.ticket_id,
         action_type=payload.action_type,
         actor_identity=payload.actor_identity,
+        approver_identity=payload.approver_identity,
         timestamp=now,
         justification=payload.justification,
         automation_request_id=payload.automation_request_id,

@@ -37,6 +37,8 @@ Excluded:
 - `POST /tickets/{ticket_id}/actions`
   - Records human actions (acknowledge, remediate, defer, accept risk, escalate).
   - Justification is mandatory for non-remediation actions.
+  - Risk acceptance requires an approver identity.
+  - Remediation requires an automation request reference.
 
 - `GET /tickets/{ticket_id}/actions`
   - Returns action history for audit.

@@ -417,6 +417,7 @@ CREATE TABLE ticket_actions (
     ticket_id UUID NOT NULL REFERENCES tickets(ticket_id),
     action_type TEXT NOT NULL, -- acknowledge, remediate, defer, accept_risk, escalate
     actor_identity UUID NOT NULL REFERENCES identities(identity_id),
+    approver_identity UUID REFERENCES identities(identity_id),
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     justification TEXT,
     automation_request_id TEXT

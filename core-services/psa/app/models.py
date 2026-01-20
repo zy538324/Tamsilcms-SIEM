@@ -92,6 +92,7 @@ class ActionRequest(BaseModel):
 
     action_type: ActionType
     actor_identity: str = Field(min_length=3)
+    approver_identity: Optional[str] = Field(default=None, max_length=120)
     justification: Optional[str] = Field(default=None, max_length=200)
     automation_request_id: Optional[str] = Field(default=None, max_length=120)
 
@@ -103,6 +104,22 @@ class ActionRequest(BaseModel):
             raise ValueError("justification_required")
         return value
 
+    @field_validator("approver_identity")
+    @classmethod
+    def validate_approver(cls, value: Optional[str], info) -> Optional[str]:
+        action_type = info.data.get("action_type")
+        if action_type == "accept_risk" and not value:
+            raise ValueError("approver_identity_required")
+        return value
+
+    @field_validator("automation_request_id")
+    @classmethod
+    def validate_automation_request(cls, value: Optional[str], info) -> Optional[str]:
+        action_type = info.data.get("action_type")
+        if action_type == "remediate" and not value:
+            raise ValueError("automation_request_required")
+        return value
+
 
 class ActionRecord(BaseModel):
     """Stored action entry for a ticket."""
@@ -111,6 +128,7 @@ class ActionRecord(BaseModel):
     ticket_id: UUID
     action_type: ActionType
     actor_identity: str
+    approver_identity: Optional[str] = None
     timestamp: datetime
     justification: Optional[str] = None
     automation_request_id: Optional[str] = None

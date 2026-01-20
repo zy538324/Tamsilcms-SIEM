@@ -96,6 +96,10 @@ class PsaStore:
     def list_evidence(self, ticket_id: UUID) -> list[dict]:
         return list(self._data["evidence"].get(str(ticket_id), []))
 
+    def list_evidence_hashes(self, ticket_id: UUID) -> set[str]:
+        evidence = self._data["evidence"].get(str(ticket_id), [])
+        return {record.get("hash_sha256") for record in evidence if record.get("hash_sha256")}
+
     def trim_actions(self, ticket_id: UUID, limit: int) -> None:
         ticket_key = str(ticket_id)
         actions = self._data["actions"].get(ticket_key, [])
