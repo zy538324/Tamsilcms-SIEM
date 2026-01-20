@@ -1,12 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { fetchComplianceSummary } from "../api/patch";
 import DataTable from "../components/DataTable";
 import MetricCard from "../components/MetricCard";
 import SectionHeader from "../components/SectionHeader";
-import { patchItems, patchMetrics, patchSchedules } from "../data/patch";
+import { patchItems, patchMetrics as fallbackMetrics, patchSchedules } from "../data/patch";
+import type { PatchMetrics } from "../data/patch";
 
 const patchFilters = ["All", "Compliant", "Scheduled", "Overdue", "Failed"] as const;
 type PatchFilter = (typeof patchFilters)[number];
+
+const tenantId = import.meta.env.VITE_TENANT_ID || "default";
 
 const PatchManagement = () => (
   <PatchWorkspace />
@@ -15,6 +19,28 @@ const PatchManagement = () => (
 const PatchWorkspace = () => {
   const [filter, setFilter] = useState<PatchFilter>("All");
   const [query, setQuery] = useState("");
+  const [metrics, setMetrics] = useState<PatchMetrics>(fallbackMetrics);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchComplianceSummary(tenantId, controller.signal)
+      .then((summary) => {
+        const total = summary.compliant + summary.pending + summary.failed;
+        const safeTotal = total === 0 ? 1 : total;
+        setMetrics({
+          compliant: Math.round((summary.compliant / safeTotal) * 100),
+          scheduled: Math.round((summary.pending / safeTotal) * 100),
+          overdue: Math.round((summary.failed / safeTotal) * 100),
+          failures: summary.failed
+        });
+      })
+      .catch(() => {
+        setMetrics(fallbackMetrics);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const filteredItems = useMemo(() => {
     const lowerQuery = query.trim().toLowerCase();
@@ -45,24 +71,24 @@ const PatchWorkspace = () => {
       <div className="grid grid--metrics">
         <MetricCard
           title="Compliant"
-          value={`${patchMetrics.compliant}%`}
+          value={`${metrics.compliant}%`}
           subtitle="Assets within policy"
           accent="success"
         />
         <MetricCard
           title="Scheduled"
-          value={`${patchMetrics.scheduled}%`}
+          value={`${metrics.scheduled}%`}
           subtitle="Next 14 days"
         />
         <MetricCard
           title="Overdue"
-          value={`${patchMetrics.overdue}%`}
+          value={`${metrics.overdue}%`}
           subtitle="Needs attention"
           accent="warning"
         />
         <MetricCard
           title="Failures"
-          value={patchMetrics.failures}
+          value={metrics.failures}
           subtitle="Blocked or failed runs"
           accent="risk"
         />

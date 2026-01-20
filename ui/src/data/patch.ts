@@ -18,6 +18,13 @@ export type PatchSchedule = {
   readiness: "Ready" | "Needs Approval" | "Blocked";
 };
 
+export type PatchMetrics = {
+  compliant: number;
+  scheduled: number;
+  overdue: number;
+  failures: number;
+};
+
 export const patchItems: PatchItem[] = [
   {
     id: "PT-901",
@@ -88,7 +95,7 @@ export const patchSchedules: PatchSchedule[] = [
   }
 ];
 
-export const patchMetrics = {
+export const patchMetrics: PatchMetrics = {
   compliant: 78,
   scheduled: 14,
   overdue: 8,

@@ -1,10 +1,82 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { fetchTicket } from "../api/psa";
 import SectionHeader from "../components/SectionHeader";
+import type { Ticket } from "../data/psa";
 import { psaTickets } from "../data/psa";
+import type { PsaTicketRecord } from "../api/psa";
+
+const mapPriority = (priority: PsaTicketRecord["priority"]): Ticket["priority"] => {
+  switch (priority) {
+    case "p1":
+      return "Critical";
+    case "p2":
+      return "High";
+    case "p3":
+      return "Medium";
+    case "p4":
+      return "Low";
+    default:
+      return "Low";
+  }
+};
+
+const mapStatus = (status: PsaTicketRecord["status"]): Ticket["status"] => {
+  switch (status) {
+    case "open":
+      return "In Progress";
+    case "acknowledged":
+      return "Awaiting Approval";
+    case "blocked":
+      return "Blocked";
+    case "resolved":
+      return "Resolved";
+    default:
+      return "New";
+  }
+};
+
+const hoursRemaining = (deadline: string) => {
+  const deadlineDate = new Date(deadline);
+  if (Number.isNaN(deadlineDate.getTime())) {
+    return 0;
+  }
+  const diffMs = deadlineDate.getTime() - Date.now();
+  return Math.max(0, Math.round(diffMs / 3600000));
+};
 
 const PsaTicketDetail = () => {
   const { ticketId } = useParams();
-  const ticket = psaTickets.find((item) => item.id === ticketId);
+  const fallbackTicket = psaTickets.find((item) => item.id === ticketId);
+  const [ticket, setTicket] = useState<Ticket | undefined>(fallbackTicket);
+
+  useEffect(() => {
+    if (!ticketId) {
+      return undefined;
+    }
+    const controller = new AbortController();
+
+    fetchTicket(ticketId, controller.signal)
+      .then((response) => {
+        const mapped: Ticket = {
+          id: response.ticket_id,
+          title: response.system_recommendation ?? "System-generated PSA ticket",
+          owner: "Service Desk",
+          priority: mapPriority(response.priority),
+          status: mapStatus(response.status),
+          slaHoursRemaining: hoursRemaining(response.sla_deadline),
+          createdAt: response.creation_timestamp,
+          linkedAsset: response.asset_id,
+          evidenceBundle: response.ticket_id
+        };
+        setTicket(mapped);
+      })
+      .catch(() => {
+        setTicket(fallbackTicket);
+      });
+
+    return () => controller.abort();
+  }, [fallbackTicket, ticketId]);
 
   if (!ticket) {
     return (
