@@ -398,20 +398,39 @@ CREATE TABLE risk_scores (
 CREATE TABLE tickets (
     ticket_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
-    title TEXT NOT NULL,
-    description TEXT,
+    source_type TEXT NOT NULL, -- finding, patch_failure, defence_action, vulnerability
+    source_reference_id TEXT NOT NULL,
+    asset_id UUID NOT NULL REFERENCES assets(asset_id),
+    risk_score NUMERIC(5,2) NOT NULL,
+    priority TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'open',
-    priority TEXT NOT NULL DEFAULT 'medium',
-    created_by UUID REFERENCES identities(identity_id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    assigned_to UUID REFERENCES identities(identity_id),
+    sla_deadline TIMESTAMPTZ NOT NULL,
+    creation_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    system_recommendation TEXT,
+    UNIQUE (tenant_id, asset_id, source_type, source_reference_id)
 );
 
-CREATE TABLE ticket_links (
+CREATE TABLE ticket_actions (
+    action_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     ticket_id UUID NOT NULL REFERENCES tickets(ticket_id),
-    detection_id UUID REFERENCES detections(detection_id),
-    event_id UUID REFERENCES events(event_id),
-    PRIMARY KEY (ticket_id, detection_id, event_id)
+    action_type TEXT NOT NULL, -- acknowledge, remediate, defer, accept_risk, escalate
+    actor_identity UUID NOT NULL REFERENCES identities(identity_id),
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    justification TEXT,
+    automation_request_id TEXT
+);
+
+CREATE TABLE ticket_evidence (
+    evidence_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_id UUID NOT NULL REFERENCES tickets(ticket_id),
+    linked_object_type TEXT NOT NULL, -- event, finding, vulnerability, patch, defence_action
+    linked_object_id TEXT NOT NULL,
+    immutable_reference TEXT NOT NULL,
+    hash_sha256 TEXT NOT NULL,
+    captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    payload JSONB
 );
 
 -- Compliance
@@ -494,3 +513,5 @@ CREATE INDEX idx_telemetry_anomalies_asset ON telemetry_anomalies(asset_id, obse
 CREATE INDEX idx_telemetry_ingest_log_asset ON telemetry_ingest_log(asset_id, received_at DESC);
 CREATE INDEX idx_tasks_asset ON tasks(asset_id);
 CREATE INDEX idx_ticket_status ON tickets(status);
+CREATE INDEX idx_ticket_priority ON tickets(priority);
+CREATE INDEX idx_ticket_sla_deadline ON tickets(sla_deadline);
