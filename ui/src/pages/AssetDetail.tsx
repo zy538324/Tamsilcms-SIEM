@@ -1,13 +1,90 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { fetchAssets } from "../api/assets";
+import { fetchAssetPatchState } from "../api/patch";
 import SectionHeader from "../components/SectionHeader";
 import { assetDetails, assets } from "../data/assets";
+import type { Asset } from "../data/assets";
+import { formatUtcTimestamp } from "../utils/formatters";
+
+const buildDefaultDetail = (asset: Asset) => ({
+  metadata: {
+    location: "Unknown",
+    environment: "Unknown",
+    owner: asset.owner,
+    lastPatch: "Unavailable"
+  },
+  telemetry: {
+    cpu: "Unavailable",
+    memory: "Unavailable",
+    uptime: "Unavailable"
+  },
+  recentEvents: ["No recent events recorded."],
+  findings: ["No findings recorded."],
+  vulnerabilities: ["No vulnerability data recorded."],
+  patchState: "Patch state unavailable",
+  defenceActions: ["No defence actions recorded."],
+  tickets: ["No tickets linked."],
+  compliancePosture: "Compliance posture unavailable"
+});
 
 const AssetDetail = () => {
   const { assetId } = useParams();
-  const asset = assets.find((item) => item.id === assetId);
-  const detail = assetId ? assetDetails[assetId as keyof typeof assetDetails] : undefined;
+  const fallbackAsset = assets.find((item) => item.id === assetId);
+  const fallbackDetail = assetId ? assetDetails[assetId as keyof typeof assetDetails] : undefined;
+  const [asset, setAsset] = useState<Asset | undefined>(fallbackAsset);
+  const [detail, setDetail] = useState<typeof fallbackDetail>(fallbackDetail);
 
-  if (!asset || !detail) {
+  useEffect(() => {
+    if (!assetId) {
+      return undefined;
+    }
+    const controller = new AbortController();
+
+    fetchAssets(controller.signal)
+      .then((response) => {
+        const matched = response.find((item) => item.id === assetId);
+        if (matched) {
+          setAsset(matched);
+        }
+      })
+      .catch(() => {
+        setAsset(fallbackAsset);
+      });
+
+    return () => controller.abort();
+  }, [assetId, fallbackAsset]);
+
+  useEffect(() => {
+    if (!assetId) {
+      return undefined;
+    }
+    const controller = new AbortController();
+
+    fetchAssetPatchState(assetId, controller.signal)
+      .then((state) => {
+        const baseDetail = fallbackDetail ?? (asset ? buildDefaultDetail(asset) : undefined);
+        if (!baseDetail) {
+          return;
+        }
+        const updatedState = state.status === "patch_blocked"
+          ? `Patch blocked: ${state.reason ?? "No reason recorded"} · ${formatUtcTimestamp(state.recorded_at)}`
+          : `Normal patch state · ${formatUtcTimestamp(state.recorded_at)}`;
+        setDetail({
+          ...baseDetail,
+          patchState: updatedState
+        });
+      })
+      .catch(() => {
+        setDetail(fallbackDetail ?? (asset ? buildDefaultDetail(asset) : undefined));
+      });
+
+    return () => controller.abort();
+  }, [asset, assetId, fallbackDetail]);
+
+  const resolvedDetail = detail ?? (asset ? buildDefaultDetail(asset) : undefined);
+
+  if (!asset || !resolvedDetail) {
     return (
       <section className="page">
         <h1>Asset not found</h1>
@@ -39,19 +116,19 @@ const AssetDetail = () => {
           <ul className="list list--compact">
             <li>
               <span>Location</span>
-              <strong>{detail.metadata.location}</strong>
+          <strong>{resolvedDetail.metadata.location}</strong>
             </li>
             <li>
               <span>Environment</span>
-              <strong>{detail.metadata.environment}</strong>
+          <strong>{resolvedDetail.metadata.environment}</strong>
             </li>
             <li>
               <span>Owner</span>
-              <strong>{detail.metadata.owner}</strong>
+          <strong>{resolvedDetail.metadata.owner}</strong>
             </li>
             <li>
               <span>Last patch</span>
-              <strong>{detail.metadata.lastPatch}</strong>
+          <strong>{resolvedDetail.metadata.lastPatch}</strong>
             </li>
           </ul>
         </section>
@@ -64,15 +141,15 @@ const AssetDetail = () => {
           <ul className="list list--compact">
             <li>
               <span>CPU</span>
-              <strong>{detail.telemetry.cpu}</strong>
+          <strong>{resolvedDetail.telemetry.cpu}</strong>
             </li>
             <li>
               <span>Memory</span>
-              <strong>{detail.telemetry.memory}</strong>
+          <strong>{resolvedDetail.telemetry.memory}</strong>
             </li>
             <li>
               <span>Uptime</span>
-              <strong>{detail.telemetry.uptime}</strong>
+          <strong>{resolvedDetail.telemetry.uptime}</strong>
             </li>
           </ul>
         </section>
@@ -83,9 +160,9 @@ const AssetDetail = () => {
             description="Context and provenance for the latest operational activity."
           />
           <ul className="list">
-            {detail.recentEvents.map((event) => (
-              <li key={event}>{event}</li>
-            ))}
+          {resolvedDetail.recentEvents.map((event) => (
+            <li key={event}>{event}</li>
+          ))}
           </ul>
         </section>
 
@@ -97,9 +174,9 @@ const AssetDetail = () => {
             actionPath="/detection-edr"
           />
           <ul className="list">
-            {detail.findings.map((finding) => (
-              <li key={finding}>{finding}</li>
-            ))}
+          {resolvedDetail.findings.map((finding) => (
+            <li key={finding}>{finding}</li>
+          ))}
           </ul>
         </section>
       </div>
@@ -113,9 +190,9 @@ const AssetDetail = () => {
             actionPath="/vulnerabilities"
           />
           <ul className="list">
-            {detail.vulnerabilities.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
+          {resolvedDetail.vulnerabilities.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
           </ul>
         </section>
 
@@ -124,7 +201,7 @@ const AssetDetail = () => {
             title="Patch state"
             description="Policy-driven maintenance context."
           />
-          <p>{detail.patchState}</p>
+          <p>{resolvedDetail.patchState}</p>
           <Link className="ghost-button" to="/patch-management">
             View maintenance window
           </Link>
@@ -136,9 +213,9 @@ const AssetDetail = () => {
             description="Traceable actions with policy attribution."
           />
           <ul className="list">
-            {detail.defenceActions.map((action) => (
-              <li key={action}>{action}</li>
-            ))}
+          {resolvedDetail.defenceActions.map((action) => (
+            <li key={action}>{action}</li>
+          ))}
           </ul>
         </section>
 
@@ -148,9 +225,9 @@ const AssetDetail = () => {
             description="PSA evidence-backed actions."
           />
           <ul className="list">
-            {detail.tickets.map((ticket) => (
-              <li key={ticket}>{ticket}</li>
-            ))}
+          {resolvedDetail.tickets.map((ticket) => (
+            <li key={ticket}>{ticket}</li>
+          ))}
           </ul>
         </section>
       </div>
@@ -160,7 +237,7 @@ const AssetDetail = () => {
           title="Compliance posture"
           description="Control evidence and drift status for this asset."
         />
-        <p>{detail.compliancePosture}</p>
+        <p>{resolvedDetail.compliancePosture}</p>
       </section>
     </section>
   );

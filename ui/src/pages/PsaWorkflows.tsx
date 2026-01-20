@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { fetchTickets } from "../api/psa";
 import DataTable from "../components/DataTable";
 import MetricCard from "../components/MetricCard";
 import SectionHeader from "../components/SectionHeader";
-import { psaMetrics, psaTickets, psaWorkload } from "../data/psa";
+import type { Ticket } from "../data/psa";
+import { psaMetrics as fallbackMetrics, psaTickets as fallbackTickets, psaWorkload } from "../data/psa";
+import type { PsaTicketRecord } from "../api/psa";
 
 const statusOptions = ["All", "New", "In Progress", "Awaiting Approval", "Blocked", "Resolved"] as const;
 type StatusOption = (typeof statusOptions)[number];
@@ -12,13 +15,112 @@ const PsaWorkflows = () => (
   <PsaWorkspace />
 );
 
+const mapPriority = (priority: PsaTicketRecord["priority"]): Ticket["priority"] => {
+  switch (priority) {
+    case "p1":
+      return "Critical";
+    case "p2":
+      return "High";
+    case "p3":
+      return "Medium";
+    case "p4":
+      return "Low";
+    default:
+      return "Low";
+  }
+};
+
+const mapStatus = (status: PsaTicketRecord["status"]): Ticket["status"] => {
+  switch (status) {
+    case "open":
+      return "In Progress";
+    case "acknowledged":
+      return "Awaiting Approval";
+    case "blocked":
+      return "Blocked";
+    case "resolved":
+      return "Resolved";
+    default:
+      return "New";
+  }
+};
+
+const hoursRemaining = (deadline: string) => {
+  const deadlineDate = new Date(deadline);
+  if (Number.isNaN(deadlineDate.getTime())) {
+    return 0;
+  }
+  const diffMs = deadlineDate.getTime() - Date.now();
+  return Math.max(0, Math.round(diffMs / 3600000));
+};
+
 const PsaWorkspace = () => {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusOption>("All");
+  const [tickets, setTickets] = useState<Ticket[]>(fallbackTickets);
+  const [metrics, setMetrics] = useState(fallbackMetrics);
+  const [workload, setWorkload] = useState(psaWorkload);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchTickets(controller.signal)
+      .then((data) => {
+        if (data.length === 0) {
+          return;
+        }
+        const mappedTickets = data.map<Ticket>((ticket) => ({
+          id: ticket.ticket_id,
+          title: ticket.system_recommendation ?? "System-generated PSA ticket",
+          owner: "Service Desk",
+          priority: mapPriority(ticket.priority),
+          status: mapStatus(ticket.status),
+          slaHoursRemaining: hoursRemaining(ticket.sla_deadline),
+          createdAt: ticket.creation_timestamp,
+          linkedAsset: ticket.asset_id,
+          evidenceBundle: ticket.ticket_id
+        }));
+        setTickets(mappedTickets);
+
+        const openTickets = mappedTickets.filter((ticket) => ticket.status !== "Resolved").length;
+        const awaitingApproval = mappedTickets.filter(
+          (ticket) => ticket.status === "Awaiting Approval"
+        ).length;
+        const breachedSla = mappedTickets.filter((ticket) => ticket.slaHoursRemaining === 0).length;
+        const meanTimeToResolveHours = mappedTickets.length
+          ? Math.round(
+            mappedTickets.reduce((sum, ticket) => sum + ticket.slaHoursRemaining, 0) / mappedTickets.length
+          )
+          : fallbackMetrics.meanTimeToResolveHours;
+
+        setMetrics({
+          openTickets,
+          awaitingApproval,
+          breachedSla,
+          meanTimeToResolveHours
+        });
+
+        const workloadMap = new Map<string, { owner: string; active: number; overdue: number }>();
+        mappedTickets.forEach((ticket) => {
+          const existing = workloadMap.get(ticket.owner) || { owner: ticket.owner, active: 0, overdue: 0 };
+          existing.active += ticket.status === "Resolved" ? 0 : 1;
+          existing.overdue += ticket.slaHoursRemaining === 0 ? 1 : 0;
+          workloadMap.set(ticket.owner, existing);
+        });
+        setWorkload(Array.from(workloadMap.values()));
+      })
+      .catch(() => {
+        setTickets(fallbackTickets);
+        setMetrics(fallbackMetrics);
+        setWorkload(psaWorkload);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const filteredTickets = useMemo(() => {
     const lowerQuery = query.trim().toLowerCase();
-    return psaTickets.filter((ticket) => {
+    return tickets.filter((ticket) => {
       const matchesQuery =
         !lowerQuery ||
         ticket.title.toLowerCase().includes(lowerQuery) ||
@@ -27,7 +129,7 @@ const PsaWorkspace = () => {
       const matchesStatus = statusFilter === "All" || ticket.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
-  }, [query, statusFilter]);
+  }, [query, statusFilter, tickets]);
 
   return (
     <section className="page">
@@ -46,24 +148,24 @@ const PsaWorkspace = () => {
       <div className="grid grid--metrics">
         <MetricCard
           title="Open tickets"
-          value={psaMetrics.openTickets}
+          value={metrics.openTickets}
           subtitle="Active items requiring action"
           accent="warning"
         />
         <MetricCard
           title="Awaiting approval"
-          value={psaMetrics.awaitingApproval}
+          value={metrics.awaitingApproval}
           subtitle="Decision queue"
         />
         <MetricCard
           title="SLA breaches"
-          value={psaMetrics.breachedSla}
+          value={metrics.breachedSla}
           subtitle="Immediate escalation required"
           accent="risk"
         />
         <MetricCard
           title="MTTR"
-          value={`${psaMetrics.meanTimeToResolveHours}h`}
+          value={`${metrics.meanTimeToResolveHours}h`}
           subtitle="Mean time to resolve"
           accent="success"
         />
@@ -137,7 +239,7 @@ const PsaWorkspace = () => {
             description="Teams under pressure, with escalation signals."
           />
           <ul className="list">
-            {psaWorkload.map((team) => (
+            {workload.map((team) => (
               <li key={team.owner}>
                 <div>
                   <strong>{team.owner}</strong>
@@ -157,7 +259,7 @@ const PsaWorkspace = () => {
             description="Decisions attributable to named roles."
           />
           <ul className="list">
-            {psaTickets
+            {tickets
               .filter((ticket) => ticket.status === "Awaiting Approval")
               .map((ticket) => (
                 <li key={ticket.id}>

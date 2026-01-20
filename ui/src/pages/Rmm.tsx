@@ -1,9 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { fetchTelemetryNodes } from "../api/rmm";
 import DataTable from "../components/DataTable";
 import MetricCard from "../components/MetricCard";
 import SectionHeader from "../components/SectionHeader";
-import { maintenanceWindows, rmmMetrics, scriptExecutions, telemetryNodes } from "../data/rmm";
+import {
+  maintenanceWindows,
+  rmmMetrics,
+  scriptExecutions,
+  telemetryNodes as fallbackNodes
+} from "../data/rmm";
+import type { TelemetryNode } from "../data/rmm";
 
 const statusFilters = ["All", "Healthy", "Degraded", "At Risk"] as const;
 type StatusFilter = (typeof statusFilters)[number];
@@ -15,10 +22,27 @@ const Rmm = () => (
 const RmmWorkspace = () => {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [nodes, setNodes] = useState<TelemetryNode[]>(fallbackNodes);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchTelemetryNodes(controller.signal)
+      .then((data) => {
+        if (data.length > 0) {
+          setNodes(data);
+        }
+      })
+      .catch(() => {
+        setNodes(fallbackNodes);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const filteredNodes = useMemo(() => {
     const lowerQuery = query.trim().toLowerCase();
-    return telemetryNodes.filter((node) => {
+    return nodes.filter((node) => {
       const matchesQuery =
         !lowerQuery ||
         node.name.toLowerCase().includes(lowerQuery) ||
@@ -26,7 +50,7 @@ const RmmWorkspace = () => {
       const matchesStatus = statusFilter === "All" || node.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
-  }, [query, statusFilter]);
+  }, [nodes, query, statusFilter]);
 
   return (
     <section className="page">

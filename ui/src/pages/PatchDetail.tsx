@@ -1,10 +1,38 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { fetchAssetPatchState } from "../api/patch";
 import SectionHeader from "../components/SectionHeader";
+import { assets } from "../data/assets";
 import { patchItems } from "../data/patch";
+import { formatUtcTimestamp } from "../utils/formatters";
 
 const PatchDetail = () => {
   const { patchId } = useParams();
   const patchItem = patchItems.find((item) => item.id === patchId);
+  const [patchState, setPatchState] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!patchItem) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    const assetId = assets.find((item) => item.name === patchItem.asset)?.id;
+
+    if (!assetId) {
+      return () => controller.abort();
+    }
+
+    fetchAssetPatchState(assetId, controller.signal)
+      .then((state) => {
+        const statusLabel = state.status === "patch_blocked" ? "Patch blocked" : "Normal";
+        setPatchState(`${statusLabel} · ${formatUtcTimestamp(state.recorded_at)}`);
+      })
+      .catch(() => {
+        setPatchState(null);
+      });
+
+    return () => controller.abort();
+  }, [patchItem]);
 
   if (!patchItem) {
     return (
@@ -55,6 +83,12 @@ const PatchDetail = () => {
               <span>Status</span>
               <strong>{patchItem.status}</strong>
             </li>
+            {patchState ? (
+              <li>
+                <span>Asset patch state</span>
+                <strong>{patchState}</strong>
+              </li>
+            ) : null}
           </ul>
         </section>
 
