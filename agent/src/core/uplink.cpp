@@ -16,8 +16,8 @@ static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* use
 
 namespace fs = std::filesystem;
 
-// Default to PSA intake endpoint
-static std::string g_endpoint = "http://10.252.0.2:8001/intake";
+// Default to local PSA intake endpoint for dev; override via TAMSIL_UPLINK_ENDPOINT.
+static std::string g_endpoint = "http://localhost:8001/intake";
 static std::string g_client_cert;
 static std::string g_client_key;
 static std::string g_api_key;
@@ -98,6 +98,9 @@ bool UploadEvidencePackage(const std::string& package_dir) {
 
     // Minimal TicketIntakeRequest JSON
     std::string asset_id = source.empty() ? "agent-local" : source;
+    if (related_id.empty()) {
+        related_id = evidence_id;
+    }
     // Escape backslashes in package_dir for JSON
     std::string json_package_dir = package_dir;
     for (size_t pos = 0; (pos = json_package_dir.find("\\", pos)) != std::string::npos; pos += 2) {
@@ -127,6 +130,7 @@ bool UploadEvidencePackage(const std::string& package_dir) {
 
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+    headers = curl_slist_append(headers, "X-Forwarded-Proto: https");
     if (!g_api_key.empty()) {
         std::string h = std::string("X-API-Key: ") + g_api_key;
         headers = curl_slist_append(headers, h.c_str());
