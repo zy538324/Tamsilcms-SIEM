@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <mutex>
 #include "../../include/agent_uplink.h"
+#include "../../include/agent_config.h"
+#include "../../include/agent_rmm.h"
 
 namespace fs = std::filesystem;
 
@@ -72,6 +74,7 @@ void EvidenceBroker::UploadEvidence(const std::string& evidence_id) {
     std::lock_guard<std::mutex> lk(g_evidence_mutex);
     for (auto &it : evidence_store_) {
         if (it.evidence_id == evidence_id) {
+            agent::Config config = agent::LoadConfig();
             // Package evidence: create a tar/zip or simple folder with metadata
             fs::path outdir = fs::current_path() / "evidence_packages" / it.evidence_id;
             fs::create_directories(outdir);
@@ -82,17 +85,30 @@ void EvidenceBroker::UploadEvidence(const std::string& evidence_id) {
                 }
                 // write metadata
                 std::ofstream meta(outdir / "metadata.txt");
+                meta << "tenant_id=" << config.tenant_id << "\n";
+                meta << "asset_id=" << config.asset_id << "\n";
                 meta << "evidence_id=" << it.evidence_id << "\n";
                 meta << "source=" << it.source << "\n";
                 meta << "type=" << it.type << "\n";
                 meta << "related_id=" << it.related_id << "\n";
                 meta << "hash=" << it.hash << "\n";
+                meta << "storage_uri=" << "file://" << outdir.string() << "\n";
                 meta << "captured_at=" << std::chrono::duration_cast<std::chrono::seconds>(it.captured_at.time_since_epoch()).count() << "\n";
                 meta.close();
             } catch(const std::exception &e) {
                 std::cerr << "UploadEvidence packaging failed: " << e.what() << std::endl;
                 return;
             }
+
+            agent_rmm::RmmTelemetryClient rmm_client(config);
+            agent_rmm::RmmEvidenceRecord record{};
+            record.asset_id = config.asset_id;
+            record.evidence_type = it.type;
+            record.related_entity = "agent";
+            record.related_id = it.related_id.empty() ? it.evidence_id : it.related_id;
+            record.hash = it.hash;
+            record.storage_uri = "file://" + outdir.string();
+            rmm_client.SendEvidenceRecord(record);
 
             // Upload via uplink
             std::string packagedir = (fs::current_path() / "evidence_packages" / it.evidence_id).string();

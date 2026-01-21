@@ -18,6 +18,9 @@ export const resolveServiceBaseUrl = (service: string) => {
   // prefer explicit per-service env var, then fall back to transport gateway
   const explicit = envBaseFor(service);
   if (explicit) return explicit;
+  if (service === "identity" && import.meta.env.DEV) {
+    return "http://localhost:8085";
+  }
   return resolveTransportBaseUrl();
 };
 
@@ -26,6 +29,10 @@ export const buildCoreServiceUrl = (service: string, path: string, baseUrl?: str
   const normalisedBase = base.replace(/\/$/, "");
   const normalisedService = sanitisePath(service).replace(/\/$/, "");
   const normalisedPath = path ? `/${sanitisePath(path)}` : "";
+  const isAbsoluteBase = /^https?:\/\//i.test(normalisedBase);
+  if (isAbsoluteBase && service === "identity") {
+    return `${normalisedBase}${normalisedPath}`;
+  }
   // If base already points to a specific service root, avoid duplicating service in path.
   if (normalisedBase.endsWith(`/${normalisedService}`)) {
     return `${normalisedBase}${normalisedPath}`;
