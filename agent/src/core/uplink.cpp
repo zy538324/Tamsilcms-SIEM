@@ -115,6 +115,9 @@ bool UploadEvidencePackage(const std::string& package_dir) {
     std::string related_id;
     std::string hash;
     std::string captured_at;
+    std::string tenant_id;
+    std::string asset_id;
+    std::string storage_uri;
     for (auto &p : fs::directory_iterator(package_dir)) {
         if (fs::is_regular_file(p.path()) && p.path().filename() == "metadata.txt") {
             std::ifstream m(p.path());
@@ -130,6 +133,9 @@ bool UploadEvidencePackage(const std::string& package_dir) {
                 else if (k == "related_id") related_id = v;
                 else if (k == "hash") hash = v;
                 else if (k == "captured_at") captured_at = v;
+                else if (k == "tenant_id") tenant_id = v;
+                else if (k == "asset_id") asset_id = v;
+                else if (k == "storage_uri") storage_uri = v;
             }
             break;
         }
@@ -141,7 +147,9 @@ bool UploadEvidencePackage(const std::string& package_dir) {
     }
 
     // Minimal TicketIntakeRequest JSON
-    std::string asset_id = source.empty() ? "agent-local" : source;
+    if (asset_id.empty()) {
+        asset_id = source.empty() ? "agent-local" : source;
+    }
     if (related_id.empty()) {
         related_id = evidence_id;
     }
@@ -151,7 +159,10 @@ bool UploadEvidencePackage(const std::string& package_dir) {
         json_package_dir.replace(pos, 1, "\\\\");
     }
     std::string json = "{";
-    json += "\"tenant_id\":\"tamsil-agent\",";
+    if (tenant_id.empty()) {
+        tenant_id = "tamsil-agent";
+    }
+    json += "\"tenant_id\":\"" + tenant_id + "\",";
     json += "\"asset_id\":\"" + asset_id + "\",";
     json += "\"source_type\":\"finding\",";
     json += "\"source_reference_id\":\"" + evidence_id + "\",";
@@ -167,7 +178,10 @@ bool UploadEvidencePackage(const std::string& package_dir) {
     json += "\"payload\":{";
     json += "\"hash\":\"" + hash + "\",";
     // include stored_uri as the package path
-    json += "\"stored_uri\":\"file://" + json_package_dir + "\"";
+    if (storage_uri.empty()) {
+        storage_uri = "file://" + json_package_dir;
+    }
+    json += "\"stored_uri\":\"" + storage_uri + "\"";
     json += "}}]}";
     // Debug: print JSON payload before sending
     std::cerr << "Intake JSON payload:\n" << json << std::endl;
@@ -192,6 +206,9 @@ bool UploadRmmEvidence(const std::string& package_dir) {
     std::string source;
     std::string related_id;
     std::string hash;
+    std::string tenant_id;
+    std::string asset_id;
+    std::string storage_uri;
     for (auto &p : fs::directory_iterator(package_dir)) {
         if (fs::is_regular_file(p.path()) && p.path().filename() == "metadata.txt") {
             std::ifstream m(p.path());
@@ -205,6 +222,9 @@ bool UploadRmmEvidence(const std::string& package_dir) {
                 else if (k == "source") source = v;
                 else if (k == "related_id") related_id = v;
                 else if (k == "hash") hash = v;
+                else if (k == "tenant_id") tenant_id = v;
+                else if (k == "asset_id") asset_id = v;
+                else if (k == "storage_uri") storage_uri = v;
             }
             break;
         }
@@ -215,7 +235,9 @@ bool UploadRmmEvidence(const std::string& package_dir) {
         return false;
     }
 
-    std::string asset_id = source.empty() ? "agent-local" : source;
+    if (asset_id.empty()) {
+        asset_id = source.empty() ? "agent-local" : source;
+    }
     if (related_id.empty()) {
         related_id = evidence_id;
     }
@@ -226,11 +248,17 @@ bool UploadRmmEvidence(const std::string& package_dir) {
     }
 
     std::string json = "{";
+    if (!tenant_id.empty()) {
+        json += "\"tenant_id\":\"" + tenant_id + "\",";
+    }
     json += "\"asset_id\":\"" + asset_id + "\",";
     json += "\"evidence_type\":\"agent_evidence\",";
     json += "\"related_entity\":\"agent\",";
     json += "\"related_id\":\"" + related_id + "\",";
-    json += "\"storage_uri\":\"file://" + json_package_dir + "\",";
+    if (storage_uri.empty()) {
+        storage_uri = "file://" + json_package_dir;
+    }
+    json += "\"storage_uri\":\"" + storage_uri + "\",";
     json += "\"hash\":\"" + hash + "\"";
     json += "}";
     std::cerr << "RMM evidence JSON payload:\n" << json << std::endl;

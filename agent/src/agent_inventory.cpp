@@ -17,6 +17,8 @@
 #include <sys/utsname.h>
 #endif
 
+#include "../include/agent_rmm.h"
+
 namespace agent {
 
 namespace {
@@ -110,6 +112,13 @@ std::optional<std::string> ReadFileValue(const std::string& path) {
         return std::nullopt;
     }
     return value;
+}
+
+std::string OptionalToString(const std::optional<std::string>& value, const std::string& fallback) {
+    if (value && !value->empty()) {
+        return *value;
+    }
+    return fallback;
 }
 
 std::optional<std::string> ExtractOsReleaseValue(const std::string& key) {
@@ -430,6 +439,15 @@ bool SendInventorySnapshot(const Config& config) {
     std::vector<SoftwareItem> software_items = CollectSoftwareInventory();
     std::vector<LocalUser> local_users = CollectLocalUsers();
     std::vector<LocalGroup> local_groups = CollectLocalGroups();
+    agent_rmm::RmmTelemetryClient rmm_client(config);
+
+    agent_rmm::RmmDeviceInventory device_inventory{};
+    device_inventory.hostname = config.hostname;
+    device_inventory.os_name = os_info.os_name;
+    device_inventory.os_version = os_info.os_version;
+    device_inventory.serial_number = OptionalToString(hardware_info.serial_number, "unknown");
+    device_inventory.collected_at = std::chrono::system_clock::now();
+    rmm_client.SendDeviceInventory(device_inventory);
 
     std::ostringstream hardware;
     hardware << '{'

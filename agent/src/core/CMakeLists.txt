@@ -3,6 +3,7 @@ add_library(agent_core_lib STATIC
     compliance.cpp
     evidence.cpp
     evidence_impl.cpp
+    ../agent_rmm.cpp
     uplink.cpp
     ipc_server.cpp
 )
