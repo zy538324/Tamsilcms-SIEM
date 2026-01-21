@@ -1,0 +1,6 @@
+evidence_id=ev-001
+source=Sensor
+type=ProcessCreateEvent
+related_id=case-123
+hash=TODO: compute hash
+captured_at=1769007295

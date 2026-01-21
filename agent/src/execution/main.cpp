@@ -17,22 +17,16 @@ int main(int argc, char* argv[]) {
         }
     }
     agent_ipc::NamedPipeClient client(pipe_name);
-    int max_retries = 10;
-    int retry_delay_ms = 500;
+    // Retry until the core server is available. In some launch scenarios the core
+    // may start after this service; keep retrying and log attempts so operators
+    // can see progress instead of exiting immediately.
+    const int retry_delay_ms = 500;
     int attempt = 0;
-    bool connected = false;
-    while (attempt < max_retries) {
-        if (client.Connect()) {
-            connected = true;
-            break;
-        }
-        std::cerr << "[ExecutionService] Failed to connect to pipe, retrying... (" << (attempt+1) << "/" << max_retries << ")" << std::endl;
-        Sleep(retry_delay_ms);
+    while (true) {
+        if (client.Connect()) break;
         attempt++;
-    }
-    if (!connected) {
-        std::cerr << "[ExecutionService] Could not connect to core agent pipe after " << max_retries << " attempts. Exiting." << std::endl;
-        return 1;
+        std::cerr << "[ExecutionService] Failed to connect to pipe, retrying... (" << attempt << ")" << std::endl;
+        Sleep(retry_delay_ms);
     }
     std::cout << "Execution Service connected to core agent pipe." << std::endl;
     // Example: Run a script job

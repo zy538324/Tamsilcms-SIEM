@@ -9,27 +9,19 @@ import { fetchFrameworkMappings } from "../api/compliance";
 import MetricCard from "../components/MetricCard";
 import SectionHeader from "../components/SectionHeader";
 import StatusPill from "../components/StatusPill";
-import {
-  assetPosture,
-  complianceDrift,
-  environmentStatus,
-  exposureTrend,
-  findingsSummary,
-  patchCompliance,
-  psaItems
-} from "../data/overview";
+// Template data removed; Overview uses live backend APIs and local default state.
 import { mapPresenceToStatus, toTitleCase } from "../utils/formatters";
 
 const tenantId = import.meta.env.VITE_TENANT_ID || "default";
 
 const Overview = () => {
-  const [assetPostureState, setAssetPostureState] = useState(assetPosture);
-  const [findingsSummaryState, setFindingsSummaryState] = useState(findingsSummary);
-  const [exposureTrendState, setExposureTrendState] = useState(exposureTrend);
-  const [patchComplianceState, setPatchComplianceState] = useState(patchCompliance);
-  const [psaItemsState, setPsaItemsState] = useState(psaItems);
-  const [complianceDriftState, setComplianceDriftState] = useState(complianceDrift);
-  const [environmentStatusState, setEnvironmentStatusState] = useState(environmentStatus);
+  const [assetPostureState, setAssetPostureState] = useState({ healthy: 0, degraded: 0, atRisk: 0 });
+  const [findingsSummaryState, setFindingsSummaryState] = useState<Array<{ category: string; confidence: string; count: number }>>([]);
+  const [exposureTrendState, setExposureTrendState] = useState<Array<{ label: string; exposure: number }>>([{ label: "Today", exposure: 0 }]);
+  const [patchComplianceState, setPatchComplianceState] = useState({ compliant: 0, scheduled: 0, overdue: 0 });
+  const [psaItemsState, setPsaItemsState] = useState<Array<{ id: string; title: string; slaHours: number; status: string }>>([]);
+  const [complianceDriftState, setComplianceDriftState] = useState<Array<{ framework: string; drift: string; nextAudit: string }>>([]);
+  const [environmentStatusState, setEnvironmentStatusState] = useState({ summary: "Healthy", rationale: "", updatedAt: new Date().toLocaleTimeString("en-GB", { timeZone: "UTC" }) + " UTC" });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -53,7 +45,7 @@ const Overview = () => {
         setAssetPostureState(postureCounts);
       })
       .catch(() => {
-        setAssetPostureState(assetPosture);
+        setAssetPostureState({ healthy: 0, degraded: 0, atRisk: 0 });
       });
 
     fetchFindings(controller.signal)
@@ -75,7 +67,7 @@ const Overview = () => {
         setFindingsSummaryState(Array.from(grouped.values()).slice(0, 4));
       })
       .catch(() => {
-        setFindingsSummaryState(findingsSummary);
+        setFindingsSummaryState([]);
       });
 
     fetchVulnerabilities(controller.signal)
@@ -95,7 +87,7 @@ const Overview = () => {
         ]);
       })
       .catch(() => {
-        setExposureTrendState(exposureTrend);
+        setExposureTrendState([{ label: "Today", exposure: 0 }]);
       });
 
     fetchComplianceSummary(tenantId, controller.signal)
@@ -112,7 +104,7 @@ const Overview = () => {
         });
       })
       .catch(() => {
-        setPatchComplianceState(patchCompliance);
+        setPatchComplianceState({ compliant: 0, scheduled: 0, overdue: 0 });
       });
 
     fetchTickets(controller.signal)
@@ -129,7 +121,7 @@ const Overview = () => {
         setPsaItemsState(items);
       })
       .catch(() => {
-        setPsaItemsState(psaItems);
+        setPsaItemsState([]);
       });
 
     fetchFrameworkMappings(controller.signal)
@@ -147,14 +139,15 @@ const Overview = () => {
         );
       })
       .catch(() => {
-        setComplianceDriftState(complianceDrift);
+        setComplianceDriftState([]);
       });
 
     return () => controller.abort();
   }, []);
 
   useEffect(() => {
-    const isDegraded = patchComplianceState.overdue > 10 || exposureTrendState[3]?.exposure > 30;
+    const latestExposure = exposureTrendState[exposureTrendState.length - 1]?.exposure ?? 0;
+    const isDegraded = patchComplianceState.overdue > 10 || latestExposure > 30;
     const summary = isDegraded ? "Degraded" : "Healthy";
     setEnvironmentStatusState({
       summary,
@@ -216,15 +209,15 @@ const Overview = () => {
         />
         <div className="stat-stack">
           <div>
-            <span className="stat-value">{assetPosture.healthy}</span>
+            <span className="stat-value">{assetPostureState.healthy}</span>
             <span className="stat-label">Healthy</span>
           </div>
           <div>
-            <span className="stat-value">{assetPosture.degraded}</span>
+            <span className="stat-value">{assetPostureState.degraded}</span>
             <span className="stat-label">Degraded</span>
           </div>
           <div>
-            <span className="stat-value">{assetPosture.atRisk}</span>
+            <span className="stat-value">{assetPostureState.atRisk}</span>
             <span className="stat-label">At Risk</span>
           </div>
         </div>

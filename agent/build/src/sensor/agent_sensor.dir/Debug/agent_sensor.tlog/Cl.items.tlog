@@ -1,4 +1,0 @@
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\sensor\main.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\sensor\agent_sensor.dir\Debug\main.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\sensor\service_entry.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\sensor\agent_sensor.dir\Debug\service_entry.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\sensor\etw_subscriber.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\sensor\agent_sensor.dir\Debug\etw_subscriber.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\sensor\ipc_client.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\sensor\agent_sensor.dir\Debug\ipc_client.obj

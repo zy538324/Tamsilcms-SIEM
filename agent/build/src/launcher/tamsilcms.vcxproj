@@ -414,6 +414,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\launcher\main.cpp" />
+    <ResourceCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\agent_icon.rc" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
