@@ -16,8 +16,8 @@ static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* use
 
 namespace fs = std::filesystem;
 
-// Default to PSA intake endpoint
-static std::string g_endpoint = "http://10.252.0.2:8001/intake";
+// Default to local PSA intake endpoint for dev; override via TAMSIL_UPLINK_ENDPOINT.
+static std::string g_endpoint = "http://localhost:8001/intake";
 static std::string g_client_cert;
 static std::string g_client_key;
 static std::string g_api_key;
