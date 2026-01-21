@@ -1,4 +1,3 @@
-import { environmentStatus } from "../data/overview";
 import StatusPill from "./StatusPill";
 
 const GlobalHeader = () => (
@@ -10,7 +9,7 @@ const GlobalHeader = () => (
       </div>
       <div className="indicator">
         <span className="eyebrow">Environment Risk</span>
-        <StatusPill status={environmentStatus.summary} />
+        <StatusPill status={"Healthy"} />
       </div>
       <div className="indicator">
         <span className="eyebrow">Active Incidents</span>
