@@ -22,11 +22,13 @@ static std::string g_client_cert;
 static std::string g_client_key;
 static std::string g_api_key;
 static std::string g_rmm_endpoint = "http://localhost:8020/rmm/evidence";
+static std::string g_psa_patch_endpoint = "http://localhost:8001/patch-results";
 
 namespace agent_uplink {
 
 void SetUplinkEndpoint(const std::string& url) { g_endpoint = url; }
 void SetRmmEndpoint(const std::string& url) { g_rmm_endpoint = url; }
+void SetPsaPatchEndpoint(const std::string& url) { g_psa_patch_endpoint = url; }
 
 void SetClientCertAndKey(const std::string& cert_path, const std::string& key_path) {
     g_client_cert = cert_path;
@@ -275,6 +277,16 @@ bool UploadRmmEvidence(const std::string& package_dir) {
     std::cerr << "RMM evidence JSON payload:\n" << json << std::endl;
 
     return PostJson(g_rmm_endpoint, json, g_api_key, g_client_cert, g_client_key);
+}
+
+bool UploadPatchResult(const std::string& payload_json) {
+    if (const char* env = std::getenv("TAMSIL_PSA_PATCH_ENDPOINT")) {
+        g_psa_patch_endpoint = std::string(env);
+    }
+    if (const char* aenv = std::getenv("TAMSIL_UPLINK_API_KEY")) {
+        g_api_key = std::string(aenv);
+    }
+    return PostJson(g_psa_patch_endpoint, payload_json, g_api_key, g_client_cert, g_client_key);
 }
 
 } // namespace agent_uplink
