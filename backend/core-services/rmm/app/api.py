@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from datetime import datetime
 from sqlalchemy.orm import Session
 import requests
 from . import db, models, schemas, config
@@ -97,3 +98,25 @@ def add_evidence(e: schemas.EvidenceCreate, session: Session = Depends(get_db)):
     session.commit()
     session.refresh(ev)
     return {"id": ev.id}
+
+
+@router.post("/device_inventory")
+def add_device_inventory(inv: schemas.DeviceInventoryCreate, session: Session = Depends(get_db)):
+    collected_at = None
+    if inv.collected_at:
+        try:
+            collected_at = datetime.fromisoformat(inv.collected_at.replace("Z", "+00:00"))
+        except ValueError:
+            collected_at = None
+    device = models.DeviceInventory(
+        asset_id=inv.asset_id,
+        hostname=inv.hostname,
+        os_name=inv.os_name,
+        os_version=inv.os_version,
+        serial_number=inv.serial_number,
+        collected_at=collected_at,
+    )
+    session.add(device)
+    session.commit()
+    session.refresh(device)
+    return {"id": device.id}

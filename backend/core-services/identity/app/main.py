@@ -8,12 +8,15 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timedelta, timezone
+import os
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 
+from .config import Settings, load_settings
 from .certificates import CertificateRecord, registry
 from .agents import AgentState, store as agent_store
 from .events import HeartbeatEvent, store
@@ -44,6 +47,18 @@ from .security import verify_signature
 from .tasks import Task, TaskResult, store as task_store
 
 app = FastAPI(title="Identity Service", version="0.1.0")
+cors_origins = tuple(
+    origin.strip()
+    for origin in os.environ.get("IDENTITY_CORS_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 
 def get_settings() -> Settings:
