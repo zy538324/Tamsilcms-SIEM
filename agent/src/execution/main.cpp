@@ -1,9 +1,11 @@
 // Execution Service
 // Responsibilities: Script execution, patching, installs, config enforcement, remote ops
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include "agent_config.h"
 #include "agent_execution.h"
-#include "agent_rmm.h"
+#include "../../include/agent_rmm.h"
 #include "../../ipc/named_pipe_ipc.h"
 #include <windows.h>
 

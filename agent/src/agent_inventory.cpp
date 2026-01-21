@@ -17,7 +17,7 @@
 #include <sys/utsname.h>
 #endif
 
-#include "agent_rmm.h"
+#include "../include/agent_rmm.h"
 
 namespace agent {
 

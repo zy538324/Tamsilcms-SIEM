@@ -64,6 +64,14 @@ struct RmmEvidenceRecord {
     std::chrono::system_clock::time_point captured_at;
 };
 
+struct RmmDeviceInventory {
+    std::string hostname;
+    std::string os_name;
+    std::string os_version;
+    std::string serial_number;
+    std::chrono::system_clock::time_point collected_at;
+};
+
 class RmmTelemetryClient {
 public:
     explicit RmmTelemetryClient(const agent::Config& config);
@@ -74,6 +82,7 @@ public:
     bool SendScriptResult(const RmmScriptResult& result) const;
     bool SendRemoteSession(const RmmRemoteSession& session) const;
     bool SendEvidenceRecord(const RmmEvidenceRecord& record) const;
+    bool SendDeviceInventory(const RmmDeviceInventory& inventory) const;
 
 private:
     agent::Config config_;

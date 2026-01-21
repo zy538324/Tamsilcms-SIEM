@@ -10,6 +10,7 @@
 #include <mutex>
 #include "../../include/agent_uplink.h"
 #include "../../include/agent_config.h"
+#include "../../include/agent_rmm.h"
 
 namespace fs = std::filesystem;
 
