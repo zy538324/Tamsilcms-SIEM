@@ -33,10 +33,6 @@ struct RmmPatchJob {
     std::string patch_id;
     std::string status;
     std::string result;
-    int exit_code = 0;
-    bool reboot_required = false;
-    std::string stdout_summary;
-    std::string stderr_summary;
     std::chrono::system_clock::time_point scheduled_at;
     std::chrono::system_clock::time_point applied_at;
 };
@@ -68,14 +64,6 @@ struct RmmEvidenceRecord {
     std::chrono::system_clock::time_point captured_at;
 };
 
-struct RmmDeviceInventory {
-    std::string hostname;
-    std::string os_name;
-    std::string os_version;
-    std::string serial_number;
-    std::chrono::system_clock::time_point collected_at;
-};
-
 class RmmTelemetryClient {
 public:
     explicit RmmTelemetryClient(const agent::Config& config);
@@ -86,7 +74,6 @@ public:
     bool SendScriptResult(const RmmScriptResult& result) const;
     bool SendRemoteSession(const RmmRemoteSession& session) const;
     bool SendEvidenceRecord(const RmmEvidenceRecord& record) const;
-    bool SendDeviceInventory(const RmmDeviceInventory& inventory) const;
 
 private:
     agent::Config config_;

@@ -172,10 +172,6 @@ bool RmmTelemetryClient::SendPatchJob(const RmmPatchJob& job) const {
     AppendString(payload, "patch_id", job.patch_id);
     AppendString(payload, "status", job.status);
     AppendString(payload, "result", job.result);
-    AppendInt(payload, "exit_code", job.exit_code);
-    AppendString(payload, "stdout_summary", job.stdout_summary);
-    AppendString(payload, "stderr_summary", job.stderr_summary);
-    payload << "\"reboot_required\":" << (job.reboot_required ? "true" : "false") << ",";
     AppendString(payload, "scheduled_at", BuildIsoTimestamp(job.scheduled_at));
     AppendString(payload, "applied_at", BuildIsoTimestamp(job.applied_at), false);
     payload << '}';
@@ -242,25 +238,6 @@ bool RmmTelemetryClient::SendEvidenceRecord(const RmmEvidenceRecord& record) con
 
     bool ok = PostJson(BuildEndpoint(config_, "/evidence"), payload.str());
     LogOutcome("evidence", correlation_id, ok);
-    return ok;
-}
-
-bool RmmTelemetryClient::SendDeviceInventory(const RmmDeviceInventory& inventory) const {
-    std::string correlation_id = GenerateCorrelationId();
-    std::ostringstream payload;
-    payload << '{';
-    AppendString(payload, "tenant_id", config_.tenant_id);
-    AppendString(payload, "asset_id", config_.asset_id);
-    AppendString(payload, "correlation_id", correlation_id);
-    AppendString(payload, "hostname", inventory.hostname);
-    AppendString(payload, "os_name", inventory.os_name);
-    AppendString(payload, "os_version", inventory.os_version);
-    AppendString(payload, "serial_number", inventory.serial_number);
-    AppendString(payload, "collected_at", BuildIsoTimestamp(inventory.collected_at), false);
-    payload << '}';
-
-    bool ok = PostJson(BuildEndpoint(config_, "/device-inventory"), payload.str());
-    LogOutcome("device_inventory", correlation_id, ok);
     return ok;
 }
 
