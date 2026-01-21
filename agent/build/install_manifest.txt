@@ -14,8 +14,5 @@ C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages
 C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages/win64/ZIP/tamsilcms-agent-0.1.0/bin/agent_sensor.exe
 C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages/win64/ZIP/tamsilcms-agent-0.1.0/bin/agent_userhelper.exe
 C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages/win64/ZIP/tamsilcms-agent-0.1.0/bin/agent_watchdog.exe
-C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages/win64/ZIP/tamsilcms-agent-0.1.0/bin/legacy.dll
-C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages/win64/ZIP/tamsilcms-agent-0.1.0/bin/libcrypto-3-x64.dll
 C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages/win64/ZIP/tamsilcms-agent-0.1.0/bin/libcurl-d.dll
-C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages/win64/ZIP/tamsilcms-agent-0.1.0/bin/libssl-3-x64.dll
 C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/_CPack_Packages/win64/ZIP/tamsilcms-agent-0.1.0/bin/zlibd1.dll

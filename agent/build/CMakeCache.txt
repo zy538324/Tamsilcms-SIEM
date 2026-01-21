@@ -19,7 +19,7 @@
 BUILD_ALL_SERVICES:BOOL=ON
 
 //Path to a program.
-CMAKE_AR:FILEPATH=C:/Program Files/Microsoft Visual Studio/18/Enterprise/VC/Tools/MSVC/14.50.35717/bin/Hostx64/x64/lib.exe
+CMAKE_AR:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/lib.exe
 
 //Semicolon separated list of supported configuration types, only
 // supports Debug, Release, MinSizeRel, and RelWithDebInfo, anything
@@ -66,7 +66,7 @@ CMAKE_FIND_PACKAGE_REDIRECTS_DIR:STATIC=C:/Users/Matt.Palmer/Documents/GitHub/Ta
 CMAKE_INSTALL_PREFIX:PATH=C:/Program Files (x86)/tamsilcms-agent
 
 //Path to a program.
-CMAKE_LINKER:FILEPATH=C:/Program Files/Microsoft Visual Studio/18/Enterprise/VC/Tools/MSVC/14.50.35717/bin/Hostx64/x64/link.exe
+CMAKE_LINKER:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/link.exe
 
 //Flags used by the linker during the creation of modules during
 // all build types.
@@ -193,25 +193,25 @@ CURL_DIR:PATH=C:/vcpkg/installed/x64-windows/share/curl
 CURL_USE_PKGCONFIG:BOOL=ON
 
 //Path to a library.
-LIB_EAY_DEBUG:FILEPATH=C:/vcpkg/installed/x64-windows/debug/lib/libcrypto.lib
+LIB_EAY_DEBUG:FILEPATH=C:/Program Files/OpenSSL-Win64/lib/VC/x64/MDd/libcrypto.lib
 
 //Path to a library.
-LIB_EAY_RELEASE:FILEPATH=C:/vcpkg/installed/x64-windows/lib/libcrypto.lib
+LIB_EAY_RELEASE:FILEPATH=C:/Program Files/OpenSSL-Win64/lib/VC/x64/MD/libcrypto.lib
 
 //Path to a file.
-MSVC_REDIST_DIR:PATH=C:/Program Files/Microsoft Visual Studio/18/Enterprise/VC/Redist/MSVC/14.50.35710
+MSVC_REDIST_DIR:PATH=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Redist/MSVC/14.44.35112
 
 //Path to a file.
-OPENSSL_APPLINK_SOURCE:FILEPATH=C:/vcpkg/installed/x64-windows/include/openssl/applink.c
+OPENSSL_APPLINK_SOURCE:FILEPATH=C:/Program Files/OpenSSL-Win64/include/openssl/applink.c
 
 //Path to a file.
-OPENSSL_INCLUDE_DIR:PATH=C:/vcpkg/installed/x64-windows/include
+OPENSSL_INCLUDE_DIR:PATH=C:/Program Files/OpenSSL-Win64/include
 
 //Path to a library.
-SSL_EAY_DEBUG:FILEPATH=C:/vcpkg/installed/x64-windows/debug/lib/libssl.lib
+SSL_EAY_DEBUG:FILEPATH=C:/Program Files/OpenSSL-Win64/lib/VC/x64/MDd/libssl.lib
 
 //Path to a library.
-SSL_EAY_RELEASE:FILEPATH=C:/vcpkg/installed/x64-windows/lib/libssl.lib
+SSL_EAY_RELEASE:FILEPATH=C:/Program Files/OpenSSL-Win64/lib/VC/x64/MD/libssl.lib
 
 //Automatically copy dependencies into the output directory for
 // executables.
@@ -328,9 +328,9 @@ CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //Name of external makefile project generator.
 CMAKE_EXTRA_GENERATOR:INTERNAL=
 //Name of generator.
-CMAKE_GENERATOR:INTERNAL=Visual Studio 18 2026
+CMAKE_GENERATOR:INTERNAL=Visual Studio 17 2022
 //Generator instance identifier.
-CMAKE_GENERATOR_INSTANCE:INTERNAL=C:/Program Files/Microsoft Visual Studio/18/Enterprise
+CMAKE_GENERATOR_INSTANCE:INTERNAL=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools
 //Name of generator platform.
 CMAKE_GENERATOR_PLATFORM:INTERNAL=
 //Name of generator toolset.
@@ -416,7 +416,7 @@ CURL_LIBRARY_RELEASE-ADVANCED:INTERNAL=1
 //vcpkg
 CURL_LIBRARY_RELEASE:INTERNAL=C:/vcpkg/installed/x64-windows/lib/libcurl.lib
 //Details about finding OpenSSL
-FIND_PACKAGE_MESSAGE_DETAILS_OpenSSL:INTERNAL=[optimized;C:/vcpkg/installed/x64-windows/lib/libcrypto.lib;debug;C:/vcpkg/installed/x64-windows/debug/lib/libcrypto.lib][C:/vcpkg/installed/x64-windows/include][ ][v3.6.0()]
+FIND_PACKAGE_MESSAGE_DETAILS_OpenSSL:INTERNAL=[optimized;C:/Program Files/OpenSSL-Win64/lib/VC/x64/MD/libcrypto.lib;debug;C:/Program Files/OpenSSL-Win64/lib/VC/x64/MDd/libcrypto.lib][C:/Program Files/OpenSSL-Win64/include][ ][v3.6.0()]
 //Details about finding ZLIB
 FIND_PACKAGE_MESSAGE_DETAILS_ZLIB:INTERNAL=[optimized;C:/vcpkg/installed/x64-windows/lib/zlib.lib;debug;C:/vcpkg/installed/x64-windows/debug/lib/zlibd.lib][C:/vcpkg/installed/x64-windows/include][ ][v1.3.1(1)]
 //ADVANCED property for variable: MSVC_REDIST_DIR

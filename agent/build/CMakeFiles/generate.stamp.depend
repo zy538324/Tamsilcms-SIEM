@@ -107,6 +107,5 @@ C:/vcpkg/installed/x64-windows/share/curl/CURLTargets-debug.cmake
 C:/vcpkg/installed/x64-windows/share/curl/CURLTargets-release.cmake
 C:/vcpkg/installed/x64-windows/share/curl/CURLTargets.cmake
 C:/vcpkg/installed/x64-windows/share/curl/vcpkg-cmake-wrapper.cmake
-C:/vcpkg/installed/x64-windows/share/openssl/vcpkg-cmake-wrapper.cmake
 C:/vcpkg/installed/x64-windows/share/zlib/vcpkg-cmake-wrapper.cmake
 C:/vcpkg/scripts/buildsystems/vcpkg.cmake

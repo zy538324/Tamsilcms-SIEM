@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\x64\Debug\ZERO_CHECK</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\core\Debug\agent_core.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\execution\Debug\agent_execution.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\Debug\agent_hello.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\sensor\Debug\agent_sensor.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\userhelper\Debug\agent_userhelper.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\watchdog\Debug\agent_watchdog.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\winservice\Debug\agent_winservice.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\core\Debug\evidence_test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\launcher\Debug\tamsilcms.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\x64\Debug\ALL_BUILD</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\x64\Debug\PACKAGE</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles />
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

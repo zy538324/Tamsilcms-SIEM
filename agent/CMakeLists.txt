@@ -27,6 +27,7 @@ add_executable(agent_hello
     src/agent_system.cpp
     src/agent_uptime.cpp
     src/agent_watchdog.cpp
+    agent_icon.rc
 )
 
 target_include_directories(agent_hello PRIVATE include)
@@ -45,7 +46,7 @@ add_subdirectory(src/launcher)
 # Many service binaries are work-in-progress and may have missing implementations.
 # Allow opting into building all services; keep it OFF by default so `package`
 # succeeds without compiling unfinished targets.
-option(BUILD_ALL_SERVICES "Build all agent service binaries (execution, sensor, userhelper, watchdog)" OFF)
+option(BUILD_ALL_SERVICES "Build all agent service binaries (execution, sensor, userhelper, watchdog)" ON)
 if(BUILD_ALL_SERVICES)
     add_subdirectory(src/execution)
     add_subdirectory(src/sensor)

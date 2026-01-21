@@ -1,0 +1,13 @@
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\main.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\main.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_config.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_config.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_crash.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_crash.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_defence.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_defence.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_id.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_id.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_inventory.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_inventory.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_signing.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_signing.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_heartbeat.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_heartbeat.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_integrity.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_integrity.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_retry.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_retry.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_system.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_system.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_uptime.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_uptime.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_watchdog.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Debug\agent_watchdog.obj
