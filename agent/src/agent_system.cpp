@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <array>
+#include <fstream>
 
 #if defined(_WIN32)
 #include <Windows.h>
@@ -10,7 +11,6 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <limits.h>
-#include <fstream>
 #endif
 
 namespace agent {
