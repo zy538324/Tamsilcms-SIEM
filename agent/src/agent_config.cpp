@@ -68,9 +68,23 @@ std::string GetEnv(const char* key, const std::string& fallback) {
 }  // namespace
 
 
+namespace {
+std::string ResolveConfigPath() {
+    std::string override_path = GetEnv("AGENT_CONFIG_PATH", "");
+    if (!override_path.empty()) {
+        return override_path;
+    }
+    std::string executable_dir = DetectExecutableDir();
+    if (!executable_dir.empty()) {
+        return executable_dir + "/config/agent_config.ini";
+    }
+    return "agent_config.ini";
+}
+}  // namespace
+
 Config LoadConfig() {
     Config config{};
-    auto ini = ParseAgentConfigIni("agent_config.ini");
+    auto ini = ParseAgentConfigIni(ResolveConfigPath());
     config.transport_url = GetIniOrEnv(ini, "transport_url", "AGENT_TRANSPORT_URL", "https://10.252.0.2:8085");
     config.tenant_id = GetIniOrEnv(ini, "tenant_id", "AGENT_TENANT_ID", "");
     config.asset_id = GetIniOrEnv(ini, "asset_id", "AGENT_ASSET_ID", "");
@@ -83,6 +97,15 @@ Config LoadConfig() {
     config.os_name = GetIniOrEnv(ini, "os_name", "AGENT_OS_NAME", "");
     if (config.os_name.empty()) {
         config.os_name = DetectOsName();
+    }
+    if (config.tenant_id.empty()) {
+        config.tenant_id = DetectTenantId();
+    }
+    if (config.asset_id.empty()) {
+        config.asset_id = config.hostname;
+    }
+    if (config.identity_id.empty()) {
+        config.identity_id = DetectIdentityId();
     }
     config.trust_state = GetIniOrEnv(ini, "trust_state", "AGENT_TRUST_STATE", "bootstrap");
     config.shared_key = GetIniOrEnv(ini, "shared_key", "AGENT_HMAC_SHARED_KEY", "");
