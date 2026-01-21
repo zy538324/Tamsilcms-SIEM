@@ -120,3 +120,13 @@ class RMMEvidence(Base):
     storage_uri = Column(String)
     hash = Column(String)
     captured_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+class DeviceInventory(Base):
+    __tablename__ = "device_inventory"
+    id = Column(String, primary_key=True, default=gen_uuid)
+    asset_id = Column(String)
+    hostname = Column(String)
+    os_name = Column(String)
+    os_version = Column(String)
+    serial_number = Column(String)
+    collected_at = Column(TIMESTAMP(timezone=True))
