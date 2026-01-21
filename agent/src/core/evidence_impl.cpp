@@ -99,6 +99,10 @@ void EvidenceBroker::UploadEvidence(const std::string& evidence_id) {
             bool ok = agent_uplink::UploadEvidencePackage(packagedir);
             if (ok) std::cout << "Evidence package uploaded: " << packagedir << std::endl;
             else std::cerr << "Evidence upload failed for: " << packagedir << std::endl;
+
+            bool rmm_ok = agent_uplink::UploadRmmEvidence(packagedir);
+            if (rmm_ok) std::cout << "RMM evidence uploaded: " << packagedir << std::endl;
+            else std::cerr << "RMM evidence upload failed for: " << packagedir << std::endl;
             return;
         }
     }

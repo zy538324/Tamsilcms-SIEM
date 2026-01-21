@@ -14,8 +14,29 @@ static std::vector<PROCESS_INFORMATION> children;
 static HANDLE g_stopEvent = nullptr;
 
 const wchar_t* SERVICE_NAME = L"TamsilCMS";
+const wchar_t* WINSERVICE_NAME = L"TamsilAgentWinService";
+const wchar_t* WINSERVICE_DISPLAY = L"Tamsil Agent WinService";
+const wchar_t* CORE_PIPE_NAME = L"\\\\.\\pipe\\tamsil_agent_pipe";
 SERVICE_STATUS_HANDLE g_statusHandle = nullptr;
 SERVICE_STATUS g_serviceStatus = {};
+
+bool FileExists(const std::wstring& path) {
+    DWORD attrs = GetFileAttributesW(path.c_str());
+    return (attrs != INVALID_FILE_ATTRIBUTES) && !(attrs & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+void WaitForCorePipe() {
+    constexpr DWORD kWaitIntervalMs = 250;
+    DWORD attempt = 0;
+    while (true) {
+        if (WaitNamedPipeW(CORE_PIPE_NAME, kWaitIntervalMs)) {
+            std::wcout << L"Core pipe available. Proceeding to launch remaining services.\n";
+            return;
+        }
+        attempt++;
+        std::wcout << L"Waiting for core pipe... (" << attempt << L")\n";
+    }
+}
 
 bool StartChild(const std::wstring &path) {
     STARTUPINFOW si{};
@@ -41,8 +62,11 @@ void ShutdownChildren() {
 }
 
 void WorkerRun(const std::wstring &dir) {
+    std::wstring core_path = dir + L"\\agent_core.exe";
+    StartChild(core_path);
+    WaitForCorePipe();
+
     std::vector<std::wstring> childrenNames = {
-        L"agent_core.exe",
         L"agent_sensor.exe",
         L"agent_execution.exe",
         L"agent_watchdog.exe"
@@ -125,6 +149,34 @@ bool InstallService(const std::wstring &exePath) {
     return started == TRUE;
 }
 
+bool InstallWinService(const std::wstring &dir) {
+    std::wstring winservice_path = dir + L"\\agent_winservice.exe";
+    if (!FileExists(winservice_path)) {
+        std::wcerr << L"agent_winservice.exe not found; skipping service creation.\n";
+        return false;
+    }
+    SC_HANDLE scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CREATE_SERVICE);
+    if (!scm) return false;
+    SC_HANDLE svc = CreateServiceW(
+        scm,
+        WINSERVICE_NAME,
+        WINSERVICE_DISPLAY,
+        SERVICE_ALL_ACCESS,
+        SERVICE_WIN32_OWN_PROCESS,
+        SERVICE_AUTO_START,
+        SERVICE_ERROR_NORMAL,
+        winservice_path.c_str(),
+        nullptr, nullptr, nullptr, nullptr, nullptr);
+    if (!svc) {
+        CloseServiceHandle(scm);
+        return false;
+    }
+    BOOL started = StartServiceW(svc, 0, nullptr);
+    CloseServiceHandle(svc);
+    CloseServiceHandle(scm);
+    return started == TRUE;
+}
+
 bool UninstallService() {
     SC_HANDLE scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
     if (!scm) return false;
@@ -139,11 +191,26 @@ bool UninstallService() {
     return deleted == TRUE;
 }
 
+bool UninstallWinService() {
+    SC_HANDLE scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
+    if (!scm) return false;
+    SC_HANDLE svc = OpenServiceW(scm, WINSERVICE_NAME, SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
+    if (!svc) { CloseServiceHandle(scm); return false; }
+    SERVICE_STATUS status{};
+    ControlService(svc, SERVICE_CONTROL_STOP, &status);
+    BOOL deleted = DeleteService(svc);
+    CloseServiceHandle(svc);
+    CloseServiceHandle(scm);
+    return deleted == TRUE;
+}
+
 int wmain(int argc, wchar_t** argv) {
     // Build exe path
     wchar_t buf[MAX_PATH];
     GetModuleFileNameW(nullptr, buf, MAX_PATH);
     std::wstring exePath(buf);
+    size_t pos = exePath.find_last_of(L"\\/");
+    std::wstring exeDir = (pos==std::wstring::npos) ? L"." : exePath.substr(0,pos);
 
     if (argc > 1) {
         std::wstring arg = argv[1];
@@ -152,6 +219,7 @@ int wmain(int argc, wchar_t** argv) {
                 std::wcerr << L"Service install failed (try running as admin)\n";
                 return 1;
             }
+            InstallWinService(exeDir);
             std::wcout << L"Service installed and started.\n";
             return 0;
         }
@@ -160,6 +228,7 @@ int wmain(int argc, wchar_t** argv) {
                 std::wcerr << L"Service uninstall failed (try running as admin)\n";
                 return 1;
             }
+            UninstallWinService();
             std::wcout << L"Service removed.\n";
             return 0;
         }
@@ -173,10 +242,7 @@ int wmain(int argc, wchar_t** argv) {
     if (!StartServiceCtrlDispatcherW(dispatchTable)) {
         // not started by SCM — run as console app
         g_stopEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
-        // Determine exe directory
-        size_t pos = exePath.find_last_of(L"\\/");
-        std::wstring dir = (pos==std::wstring::npos) ? L"." : exePath.substr(0,pos);
-        std::thread worker(WorkerRun, dir);
+        std::thread worker(WorkerRun, exeDir);
         std::wcout << L"TamsilCMS running in console. Press Enter to stop.\n";
         std::wstring dummy; std::getline(std::wcin, dummy);
         SetEvent(g_stopEvent);
