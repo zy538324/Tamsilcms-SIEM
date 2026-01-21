@@ -20,6 +20,7 @@ add_executable(agent_hello
     src/agent_defence.cpp
     src/agent_id.cpp
     src/agent_inventory.cpp
+    src/agent_rmm.cpp
     src/agent_signing.cpp
     src/agent_heartbeat.cpp
     src/agent_integrity.cpp
