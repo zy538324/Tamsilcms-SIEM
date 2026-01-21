@@ -4,6 +4,8 @@ add_library(agent_core_lib STATIC
     evidence.cpp
     evidence_impl.cpp
     ../agent_rmm.cpp
+    ../agent_config.cpp
+    ../agent_system.cpp
     uplink.cpp
     ipc_server.cpp
 )

@@ -4,6 +4,8 @@ add_executable(agent_execution
     ExecutionService_stub.cpp
     RegisterService_stub.cpp
     ../agent_rmm.cpp
+    ../agent_config.cpp
+    ../agent_system.cpp
 )
 
 target_include_directories(agent_execution PRIVATE ../../include)
