@@ -98,6 +98,9 @@ bool UploadEvidencePackage(const std::string& package_dir) {
 
     // Minimal TicketIntakeRequest JSON
     std::string asset_id = source.empty() ? "agent-local" : source;
+    if (related_id.empty()) {
+        related_id = evidence_id;
+    }
     // Escape backslashes in package_dir for JSON
     std::string json_package_dir = package_dir;
     for (size_t pos = 0; (pos = json_package_dir.find("\\", pos)) != std::string::npos; pos += 2) {
