@@ -47,4 +47,28 @@ std::string SignPayload(const std::string& shared_key,
     return Base64Encode(digest.data(), length);
 }
 
+namespace {
+bool SecureEquals(const std::string& lhs, const std::string& rhs) {
+    if (lhs.size() != rhs.size()) {
+        return false;
+    }
+    unsigned char result = 0;
+    for (size_t i = 0; i < lhs.size(); ++i) {
+        result |= static_cast<unsigned char>(lhs[i] ^ rhs[i]);
+    }
+    return result == 0;
+}
+}  // namespace
+
+bool VerifySignature(const std::string& shared_key,
+                     const std::string& payload,
+                     long long timestamp_seconds,
+                     const std::string& signature) {
+    if (shared_key.empty()) {
+        return false;
+    }
+    std::string expected = SignPayload(shared_key, payload, timestamp_seconds);
+    return SecureEquals(expected, signature);
+}
+
 }  // namespace agent

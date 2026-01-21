@@ -22,9 +22,38 @@ namespace agent_execution {
         std::chrono::system_clock::time_point completed_at;
     };
 
+    struct PatchDescriptor {
+        std::string patch_id;
+        std::string title;
+        std::string vendor;
+        std::string severity;
+        std::string kb;
+    };
+
+    struct PatchJob {
+        std::string job_id;
+        std::string asset_id;
+        std::string reboot_policy;
+        std::chrono::system_clock::time_point scheduled_at;
+        std::vector<PatchDescriptor> patches;
+    };
+
+    struct PatchJobResult {
+        std::string job_id;
+        std::string status;
+        std::string result;
+        int exit_code;
+        bool reboot_required;
+        std::string stdout_summary;
+        std::string stderr_summary;
+        std::chrono::system_clock::time_point started_at;
+        std::chrono::system_clock::time_point completed_at;
+    };
+
     class ExecutionService {
     public:
         ExecutionResult RunScript(const ScriptJob& job);
+        PatchJobResult ApplyPatchJob(const PatchJob& job);
         // TODO: Patch management, software install/uninstall, config enforcement, remote ops
     };
 }
