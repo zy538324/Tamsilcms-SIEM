@@ -87,6 +87,7 @@ if(TARGET agent_watchdog)
     install(TARGETS agent_watchdog RUNTIME DESTINATION bin)
 endif()
 
+install(FILES agent_config.ini agent.env DESTINATION config)
 
 # Try to copy runtime DLLs from vcpkg prefix (first entry of CMAKE_PREFIX_PATH)
 if(CMAKE_PREFIX_PATH)
