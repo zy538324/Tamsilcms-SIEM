@@ -130,6 +130,7 @@ bool UploadEvidencePackage(const std::string& package_dir) {
 
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+    headers = curl_slist_append(headers, "X-Forwarded-Proto: https");
     if (!g_api_key.empty()) {
         std::string h = std::string("X-API-Key: ") + g_api_key;
         headers = curl_slist_append(headers, h.c_str());
