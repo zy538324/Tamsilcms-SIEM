@@ -28,6 +28,8 @@ C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeSystemSpecificInitialize.cma
 C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeTestCXXCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeTestCompilerCommon.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeTestRCCompiler.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CPack.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CPackComponent.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/Compiler/ADSP-DetermineCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/Compiler/ARMCC-DetermineCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/Compiler/ARMClang-DetermineCompiler.cmake
@@ -77,6 +79,7 @@ C:/Program Files/CMake/share/cmake-4.2/Modules/FindOpenSSL.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/FindPackageMessage.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/FindZLIB.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/InstallRequiredSystemLibraries.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/Internal/CMakeCXXLinkerInformation.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/Internal/CMakeCommonLinkerInformation.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/Internal/CMakeDetermineLinkerId.cmake
@@ -93,6 +96,7 @@ C:/Program Files/CMake/share/cmake-4.2/Modules/Platform/Windows-MSVC.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/Platform/Windows.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/Platform/WindowsPaths.cmake
 C:/Program Files/CMake/share/cmake-4.2/Modules/SelectLibraryConfigurations.cmake
+C:/Program Files/CMake/share/cmake-4.2/Templates/CPackConfig.cmake.in
 C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/CMakeLists.txt
 C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/CMakeFiles/4.2.1/CMakeCXXCompiler.cmake
 C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/CMakeFiles/4.2.1/CMakeRCCompiler.cmake

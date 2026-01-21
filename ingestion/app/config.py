@@ -31,7 +31,7 @@ def load_settings() -> Settings:
         service_name=os.environ.get("INGESTION_SERVICE_NAME", "ingestion-service"),
         database_dsn=os.environ.get(
             "INGESTION_DATABASE_DSN",
-            "postgresql://postgres:postgres@localhost:5432/tamsil",
+            "postgresql://tamsilsiem:1792BigDirtyDykes!@10.252.0.25:5432/tamsilcmssiem?sslmode=require",
         ),
         database_min_connections=int(os.environ.get("INGESTION_DB_MIN_CONN", "1")),
         database_max_connections=int(os.environ.get("INGESTION_DB_MAX_CONN", "5")),

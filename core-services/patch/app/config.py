@@ -1,3 +1,4 @@
+# Default PostgreSQL DSN: postgresql://tamsilsiem:changeme@localhost:5432/tamsil
 """Configuration for the Patch Management service."""
 from __future__ import annotations
 

@@ -1,3 +1,4 @@
+# Default PostgreSQL DSN: postgresql://tamsilsiem:changeme@localhost:5432/tamsil
 """Configuration for the Identity service.
 
 All secrets are sourced from environment variables to avoid hard-coding.

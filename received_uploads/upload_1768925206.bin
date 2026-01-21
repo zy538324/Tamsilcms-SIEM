@@ -1,0 +1,17 @@
+--------------------------857kUnbyd9ficOSVy8giEx
+Content-Disposition: form-data; name="metadata.txt"; filename="metadata.txt"
+Content-Type: text/plain
+
+evidence_id=test-ev-001
+source=unit-test
+type=test
+related_id=case-test
+hash=c7cc7708b4629bf85922f8ed412808072f333b014eabfd5705b489a5bd84e8f8
+captured_at=1768925206
+
+--------------------------857kUnbyd9ficOSVy8giEx
+Content-Disposition: form-data; name="tmp_evidence.bin"; filename="tmp_evidence.bin"
+Content-Type: application/octet-stream
+
+sample evidence content
+--------------------------857kUnbyd9ficOSVy8giEx--

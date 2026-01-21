@@ -13,6 +13,7 @@ Notes:
 
 from __future__ import annotations
 import asyncio
+import os
 import run_services
 from pathlib import Path
 
@@ -32,6 +33,10 @@ extra_services = {
 for name, cfg in extra_services.items():
     if name not in run_services.SERVICES:
         run_services.SERVICES[name] = cfg
+
+# For development convenience, bind PSA to all interfaces unless explicitly overridden
+if os.environ.get("PSA_HOST") is None:
+    os.environ["PSA_HOST"] = "0.0.0.0"
 
 
 def main():

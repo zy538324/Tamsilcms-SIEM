@@ -1,0 +1,18 @@
+// agent_uplink.h
+// Simple uplink client to POST evidence packages to PSA over HTTPS using libcurl
+#pragma once
+#include <string>
+
+namespace agent_uplink {
+    // Configure the uplink endpoint (e.g., "https://psa.example.com/api/evidence")
+    void SetUplinkEndpoint(const std::string& url);
+
+    // Upload a prepared evidence package directory. Returns true on success.
+    bool UploadEvidencePackage(const std::string& package_dir);
+
+    // Set path to client cert/key for mutual TLS (optional)
+    void SetClientCertAndKey(const std::string& cert_path, const std::string& key_path);
+    
+    // Set API key to include as X-API-Key header
+    void SetApiKey(const std::string& api_key);
+}

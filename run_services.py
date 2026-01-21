@@ -50,7 +50,7 @@ SERVICES: Dict[str, Dict] = {
         "port": 8000,
         "env": {
             # Default points to example remote DB; override locally if needed
-            "INGESTION_DATABASE_DSN": "postgresql://tamsilsiem:Strong!Passw0rd@10.252.0.25:5432/tamsilcmssiem?sslmode=require",
+            "INGESTION_DATABASE_DSN": "postgresql://tamsilsiem:1792BigDirtyDykes!@10.252.0.25:5432/tamsilcmssiem?sslmode=require",
         },
     },
     "patch": {

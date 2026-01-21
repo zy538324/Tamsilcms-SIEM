@@ -1,7 +1,16 @@
 {
 	"InstallScripts" : 
 	[
-		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/cmake_install.cmake"
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/ipc/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/stubs/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/core/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/launcher/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/execution/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/sensor/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/userhelper/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/watchdog/cmake_install.cmake",
+		"C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/winservice/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

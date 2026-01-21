@@ -10,6 +10,9 @@
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_crash.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_defence.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_id.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

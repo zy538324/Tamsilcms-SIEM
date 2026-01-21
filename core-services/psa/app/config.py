@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("PSA_DATABASE_URL") or "sqlite:///./psa.db"
+DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("PSA_DATABASE_URL") or "postgresql://tamsilsiem:1792BigDirtyDykes!@10.252.0.25:5432/tamsilcmssiem?sslmode=require"
 
 SERVICE_NAME = "psa"
 """Configuration for the PSA workflow engine.

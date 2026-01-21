@@ -1,3 +1,4 @@
+# Default PostgreSQL DSN: postgresql://tamsilsiem:changeme@localhost:5432/tamsil
 """Configuration for the Detection & Correlation service."""
 from __future__ import annotations
 

@@ -1,6 +1,7 @@
 C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\main.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Release\main.obj
 C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_config.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Release\agent_config.obj
 C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_crash.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Release\agent_crash.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_defence.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Release\agent_defence.obj
 C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_id.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Release\agent_id.obj
 C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_inventory.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Release\agent_inventory.obj
 C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_signing.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\agent_hello.dir\Release\agent_signing.obj

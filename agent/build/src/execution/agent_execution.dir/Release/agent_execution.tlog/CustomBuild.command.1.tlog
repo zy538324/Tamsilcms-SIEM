@@ -1,0 +1,10 @@
+^C:\USERS\MATT.PALMER\DOCUMENTS\GITHUB\TAMSILCMS-SIEM\AGENT\SRC\EXECUTION\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent -BC:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build --check-stamp-file C:/Users/Matt.Palmer/Documents/GitHub/Tamsilcms-SIEM/agent/build/src/execution/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
