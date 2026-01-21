@@ -65,6 +65,9 @@ def get_store(settings: Settings = Depends(get_settings)) -> PatchStore:
 async def enforce_https(request: Request) -> None:
     """Reject non-HTTPS requests."""
     forwarded_proto = request.headers.get("x-forwarded-proto", "http")
+    # Allow CORS preflight requests to pass through without HTTPS enforcement
+    if request.method == "OPTIONS":
+        return None
     if forwarded_proto.lower() != "https":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

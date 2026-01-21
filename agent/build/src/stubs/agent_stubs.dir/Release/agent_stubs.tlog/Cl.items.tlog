@@ -1,0 +1,7 @@
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\stubs\identity_stub.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\stubs\agent_stubs.dir\Release\identity_stub.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\stubs\core_stubs.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\stubs\agent_stubs.dir\Release\core_stubs.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\stubs\execution_stub.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\stubs\agent_stubs.dir\Release\execution_stub.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\stubs\module_registry_stub.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\stubs\agent_stubs.dir\Release\module_registry_stub.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\stubs\compliance_stub.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\stubs\agent_stubs.dir\Release\compliance_stub.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\stubs\winservice_stub.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\stubs\agent_stubs.dir\Release\winservice_stub.obj
+C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\stubs\sensor_service_stub.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\stubs\agent_stubs.dir\Release\sensor_service_stub.obj

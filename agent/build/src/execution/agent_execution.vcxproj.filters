@@ -13,6 +13,15 @@
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\RegisterService_stub.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_rmm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\CMakeLists.txt" />

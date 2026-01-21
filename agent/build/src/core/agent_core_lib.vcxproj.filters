@@ -10,6 +10,15 @@
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\core\evidence_impl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_rmm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\core\uplink.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

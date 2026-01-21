@@ -41,6 +41,9 @@ async def enforce_https(request: Request) -> None:
 
     Transport terminates TLS at the edge proxy and forwards HTTPS headers.
     """
+    # Allow CORS preflight requests to pass through without HTTPS enforcement
+    if request.method == "OPTIONS":
+        return None
     forwarded_proto = request.headers.get("x-forwarded-proto", "http")
     if forwarded_proto.lower() != "https":
         raise HTTPException(

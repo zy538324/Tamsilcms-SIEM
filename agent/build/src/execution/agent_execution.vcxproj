@@ -425,6 +425,9 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\service_entry.cpp" />
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\ExecutionService_stub.cpp" />
     <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\RegisterService_stub.cpp" />
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_rmm.cpp" />
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_config.cpp" />
+    <ClCompile Include="C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_system.cpp" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

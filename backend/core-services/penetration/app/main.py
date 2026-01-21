@@ -54,6 +54,9 @@ def get_store(settings: Settings = Depends(get_settings)) -> PenTestStore:
 
 async def enforce_https(request: Request, settings: Settings) -> None:
     """Reject non-HTTPS requests when configured."""
+    # Allow CORS preflight requests to pass through without HTTPS enforcement
+    if request.method == "OPTIONS":
+        return None
     if not settings.https_enforced:
         return
     forwarded_proto = request.headers.get("x-forwarded-proto", "http")

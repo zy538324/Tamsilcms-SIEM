@@ -105,6 +105,9 @@ def validate_schema_version(payload: TelemetryPayload) -> None:
 
 
 async def enforce_https(request: Request) -> None:
+    # Allow CORS preflight requests to pass through without HTTPS enforcement
+    if request.method == "OPTIONS":
+        return None
     forwarded_proto = request.headers.get("x-forwarded-proto", "http")
     if forwarded_proto.lower() != "https":
         raise HTTPException(
