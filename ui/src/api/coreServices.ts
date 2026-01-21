@@ -18,6 +18,9 @@ export const resolveServiceBaseUrl = (service: string) => {
   // prefer explicit per-service env var, then fall back to transport gateway
   const explicit = envBaseFor(service);
   if (explicit) return explicit;
+  if (service === "identity" && import.meta.env.DEV) {
+    return "http://localhost:8085";
+  }
   return resolveTransportBaseUrl();
 };
 
