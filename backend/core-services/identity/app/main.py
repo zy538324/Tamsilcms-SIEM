@@ -257,6 +257,34 @@ async def health_check(settings: Settings = Depends(get_settings)) -> dict:
     }
 
 
+@app.get("/status", response_class=JSONResponse)
+async def status_check(settings: Settings = Depends(get_settings)) -> dict:
+    """Expose in-memory store counts for diagnostics."""
+    heartbeats = store.list_recent()
+    agents = agent_store.list_all()
+    scores = risk_store.list_all()
+    last_heartbeat_at = max(
+        (event.received_at for event in heartbeats),
+        default=None,
+    )
+    last_agent_seen_at = max(
+        (agent.last_seen_at for agent in agents),
+        default=None,
+    )
+
+    return {
+        "service": settings.service_name,
+        "storage": "memory",
+        "counts": {
+            "heartbeats": len(heartbeats),
+            "agents": len(agents),
+            "risk_scores": len(scores),
+        },
+        "last_heartbeat_at": last_heartbeat_at.isoformat() if last_heartbeat_at else None,
+        "last_agent_seen_at": last_agent_seen_at.isoformat() if last_agent_seen_at else None,
+    }
+
+
 @app.post("/hello", response_model=HelloResponse)
 async def hello(
     request: Request,
