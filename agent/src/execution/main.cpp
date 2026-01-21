@@ -7,6 +7,21 @@
 #include "../../ipc/named_pipe_ipc.h"
 #include <windows.h>
 
+namespace {
+std::string BuildIsoTimestamp(const std::chrono::system_clock::time_point& time_point) {
+    auto now_time = std::chrono::system_clock::to_time_t(time_point);
+    std::tm utc_tm{};
+#if defined(_WIN32)
+    gmtime_s(&utc_tm, &now_time);
+#else
+    gmtime_r(&now_time, &utc_tm);
+#endif
+    std::ostringstream stream;
+    stream << std::put_time(&utc_tm, "%FT%TZ");
+    return stream.str();
+}
+}  // namespace
+
 int main(int argc, char* argv[]) {
     // Attempt to connect to the core agent named pipe before running jobs
     // Validate pipe name (must not contain invalid characters)
