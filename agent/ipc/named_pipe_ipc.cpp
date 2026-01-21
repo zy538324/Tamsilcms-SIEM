@@ -7,13 +7,13 @@ namespace agent_ipc {
     NamedPipeServer::~NamedPipeServer() { Close(); }
 
     bool NamedPipeServer::Start() {
-        // Sanitize pipe_name_ (must be non-empty, only alnum/_/-)
-        std::wstring safe_name;
-        for (wchar_t c : pipe_name_) {
-            if (iswalnum(c) || c == L'_' || c == L'-') safe_name += c;
+        // Accept either a full pipe path or just the pipe name
+        std::wstring full;
+        if (pipe_name_.substr(0, 9) == L"\\.\\pipe\\") {
+            full = pipe_name_;
+        } else {
+            full = L"\\.\\pipe\\" + pipe_name_;
         }
-        if (safe_name.empty()) safe_name = L"tamsil_agent_pipe";
-        std::wstring full = L"\\.\\pipe\\" + safe_name;
         std::wcout << L"[IPC] Creating named pipe: " << full << std::endl;
         pipe_handle_ = CreateNamedPipeW(full.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
             PIPE_UNLIMITED_INSTANCES, 4096, 4096, 0, nullptr);
