@@ -3,6 +3,7 @@ add_executable(agent_execution
     service_entry.cpp
     ExecutionService_stub.cpp
     RegisterService_stub.cpp
+    ../agent_rmm.cpp
 )
 
 target_include_directories(agent_execution PRIVATE ../../include)
