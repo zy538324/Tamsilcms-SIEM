@@ -36,6 +36,34 @@ void SetClientCertAndKey(const std::string& cert_path, const std::string& key_pa
 void SetApiKey(const std::string& api_key) { g_api_key = api_key; }
 
 namespace {
+std::string EscapeJsonString(const std::string& input) {
+    std::string escaped;
+    escaped.reserve(input.size() + 8);
+    for (char c : input) {
+        switch (c) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\t':
+                escaped += "\\t";
+                break;
+            default:
+                escaped += c;
+                break;
+        }
+    }
+    return escaped;
+}
+
 bool PostJson(
     const std::string& endpoint,
     const std::string& json,
@@ -115,6 +143,9 @@ bool UploadEvidencePackage(const std::string& package_dir) {
     std::string related_id;
     std::string hash;
     std::string captured_at;
+    std::string tenant_id;
+    std::string asset_id;
+    std::string storage_uri;
     for (auto &p : fs::directory_iterator(package_dir)) {
         if (fs::is_regular_file(p.path()) && p.path().filename() == "metadata.txt") {
             std::ifstream m(p.path());
@@ -130,6 +161,9 @@ bool UploadEvidencePackage(const std::string& package_dir) {
                 else if (k == "related_id") related_id = v;
                 else if (k == "hash") hash = v;
                 else if (k == "captured_at") captured_at = v;
+                else if (k == "tenant_id") tenant_id = v;
+                else if (k == "asset_id") asset_id = v;
+                else if (k == "storage_uri") storage_uri = v;
             }
             break;
         }
@@ -141,7 +175,12 @@ bool UploadEvidencePackage(const std::string& package_dir) {
     }
 
     // Minimal TicketIntakeRequest JSON
-    std::string asset_id = source.empty() ? "agent-local" : source;
+    if (asset_id.empty()) {
+        asset_id = source.empty() ? "agent-local" : source;
+    }
+    if (asset_id.size() < 3) {
+        asset_id = "agent-local";
+    }
     if (related_id.empty()) {
         related_id = evidence_id;
     }
@@ -151,23 +190,37 @@ bool UploadEvidencePackage(const std::string& package_dir) {
         json_package_dir.replace(pos, 1, "\\\\");
     }
     std::string json = "{";
-    json += "\"tenant_id\":\"tamsil-agent\",";
-    json += "\"asset_id\":\"" + asset_id + "\",";
+    if (tenant_id.empty() || tenant_id.size() < 3) {
+        tenant_id = "tamsil-agent";
+    }
+    json += "\"tenant_id\":\"" + EscapeJsonString(tenant_id) + "\",";
+    json += "\"asset_id\":\"" + EscapeJsonString(asset_id) + "\",";
     json += "\"source_type\":\"finding\",";
-    json += "\"source_reference_id\":\"" + evidence_id + "\",";
+    json += "\"source_reference_id\":\"" + EscapeJsonString(evidence_id) + "\",";
     json += "\"risk_score\":50.0,";
     json += "\"asset_criticality\":\"medium\",";
     json += "\"exposure_level\":\"internal\",";
     json += "\"time_sensitivity\":\"none\",";
     json += "\"system_recommendation\":null,";
     json += "\"evidence\":[{";
+    std::string linked_object_id = related_id;
+    if (linked_object_id.size() < 3) {
+        linked_object_id = evidence_id;
+    }
+    if (linked_object_id.size() < 3) {
+        linked_object_id = "ev-" + evidence_id;
+    }
+    std::string immutable_reference = evidence_id.size() < 3 ? "ev-" + evidence_id : evidence_id;
     json += "\"linked_object_type\":\"finding\",";
-    json += "\"linked_object_id\":\"" + related_id + "\",";
-    json += "\"immutable_reference\":\"" + evidence_id + "\",";
+    json += "\"linked_object_id\":\"" + EscapeJsonString(linked_object_id) + "\",";
+    json += "\"immutable_reference\":\"" + EscapeJsonString(immutable_reference) + "\",";
     json += "\"payload\":{";
-    json += "\"hash\":\"" + hash + "\",";
+    json += "\"hash\":\"" + EscapeJsonString(hash) + "\",";
     // include stored_uri as the package path
-    json += "\"stored_uri\":\"file://" + json_package_dir + "\"";
+    if (storage_uri.empty()) {
+        storage_uri = "file://" + json_package_dir;
+    }
+    json += "\"stored_uri\":\"" + EscapeJsonString(storage_uri) + "\"";
     json += "}}]}";
     // Debug: print JSON payload before sending
     std::cerr << "Intake JSON payload:\n" << json << std::endl;
@@ -192,6 +245,9 @@ bool UploadRmmEvidence(const std::string& package_dir) {
     std::string source;
     std::string related_id;
     std::string hash;
+    std::string tenant_id;
+    std::string asset_id;
+    std::string storage_uri;
     for (auto &p : fs::directory_iterator(package_dir)) {
         if (fs::is_regular_file(p.path()) && p.path().filename() == "metadata.txt") {
             std::ifstream m(p.path());
@@ -205,6 +261,9 @@ bool UploadRmmEvidence(const std::string& package_dir) {
                 else if (k == "source") source = v;
                 else if (k == "related_id") related_id = v;
                 else if (k == "hash") hash = v;
+                else if (k == "tenant_id") tenant_id = v;
+                else if (k == "asset_id") asset_id = v;
+                else if (k == "storage_uri") storage_uri = v;
             }
             break;
         }
@@ -215,7 +274,9 @@ bool UploadRmmEvidence(const std::string& package_dir) {
         return false;
     }
 
-    std::string asset_id = source.empty() ? "agent-local" : source;
+    if (asset_id.empty()) {
+        asset_id = source.empty() ? "agent-local" : source;
+    }
     if (related_id.empty()) {
         related_id = evidence_id;
     }
@@ -226,12 +287,18 @@ bool UploadRmmEvidence(const std::string& package_dir) {
     }
 
     std::string json = "{";
-    json += "\"asset_id\":\"" + asset_id + "\",";
+    if (!tenant_id.empty()) {
+        json += "\"tenant_id\":\"" + tenant_id + "\",";
+    }
+    json += "\"asset_id\":\"" + EscapeJsonString(asset_id) + "\",";
     json += "\"evidence_type\":\"agent_evidence\",";
     json += "\"related_entity\":\"agent\",";
-    json += "\"related_id\":\"" + related_id + "\",";
-    json += "\"storage_uri\":\"file://" + json_package_dir + "\",";
-    json += "\"hash\":\"" + hash + "\"";
+    json += "\"related_id\":\"" + EscapeJsonString(related_id) + "\",";
+    if (storage_uri.empty()) {
+        storage_uri = "file://" + json_package_dir;
+    }
+    json += "\"storage_uri\":\"" + EscapeJsonString(storage_uri) + "\",";
+    json += "\"hash\":\"" + EscapeJsonString(hash) + "\"";
     json += "}";
     std::cerr << "RMM evidence JSON payload:\n" << json << std::endl;
 

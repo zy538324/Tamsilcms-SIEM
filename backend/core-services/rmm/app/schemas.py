@@ -53,3 +53,11 @@ class EvidenceCreate(BaseModel):
     related_id: Optional[str]
     storage_uri: Optional[str]
     hash: Optional[str]
+
+class DeviceInventoryCreate(BaseModel):
+    asset_id: str
+    hostname: Optional[str]
+    os_name: Optional[str]
+    os_version: Optional[str]
+    serial_number: Optional[str]
+    collected_at: Optional[str]
