@@ -11,60 +11,50 @@
 namespace agent_rmm {
 
 struct RmmConfigProfile {
-    std::string profile_id;
     std::string name;
-    std::string version;
-    std::string status;
-    std::string checksum;
-    std::chrono::system_clock::time_point applied_at;
+    std::string profile_type;
+    std::string description;
 };
 
 struct RmmPatchCatalogItem {
-    std::string patch_id;
-    std::string title;
     std::string vendor;
-    std::string severity;
-    std::string kb;
+    std::string product;
+    std::string patch_id;
     std::string release_date;
+    int severity;
 };
 
 struct RmmPatchJob {
-    std::string job_id;
-    std::string patch_id;
-    std::string status;
-    std::string result;
-    std::chrono::system_clock::time_point scheduled_at;
-    std::chrono::system_clock::time_point applied_at;
+    std::string psa_case_id;
+    std::string scheduled_for;
+    std::string reboot_policy;
 };
 
 struct RmmScriptResult {
     std::string job_id;
-    std::string script_type;
+    std::string stdout_data;
+    std::string stderr_data;
     int exit_code;
-    std::string stdout_summary;
-    std::string stderr_summary;
-    std::chrono::system_clock::time_point started_at;
-    std::chrono::system_clock::time_point completed_at;
+    std::string hash;
 };
 
 struct RmmRemoteSession {
-    std::string session_id;
-    std::string operator_id;
-    std::string status;
-    std::chrono::system_clock::time_point started_at;
-    std::chrono::system_clock::time_point ended_at;
+    std::string asset_id;
+    std::string initiated_by;
+    std::string session_type;
 };
 
 struct RmmEvidenceRecord {
-    std::string evidence_id;
+    std::string asset_id;
     std::string evidence_type;
-    std::string hash;
-    std::string storage_uri;
+    std::string related_entity;
     std::string related_id;
-    std::chrono::system_clock::time_point captured_at;
+    std::string storage_uri;
+    std::string hash;
 };
 
 struct RmmDeviceInventory {
+    std::string asset_id;
     std::string hostname;
     std::string os_name;
     std::string os_version;

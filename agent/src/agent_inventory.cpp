@@ -442,6 +442,7 @@ bool SendInventorySnapshot(const Config& config) {
     agent_rmm::RmmTelemetryClient rmm_client(config);
 
     agent_rmm::RmmDeviceInventory device_inventory{};
+    device_inventory.asset_id = config.asset_id;
     device_inventory.hostname = config.hostname;
     device_inventory.os_name = os_info.os_name;
     device_inventory.os_version = os_info.os_version;

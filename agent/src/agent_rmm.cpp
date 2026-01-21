@@ -40,6 +40,17 @@ std::string JsonEscape(const std::string& input) {
     return escaped.str();
 }
 
+std::string GenerateCorrelationId() {
+    std::random_device random_device;
+    std::mt19937 rng(random_device());
+    std::uniform_int_distribution<int> dist(0, 15);
+    std::ostringstream stream;
+    for (int i = 0; i < 32; ++i) {
+        stream << std::hex << dist(rng);
+    }
+    return stream.str();
+}
+
 std::string BuildIsoTimestamp(const std::chrono::system_clock::time_point& time_point) {
     auto now_time = std::chrono::system_clock::to_time_t(time_point);
     std::tm utc_tm{};
@@ -50,17 +61,6 @@ std::string BuildIsoTimestamp(const std::chrono::system_clock::time_point& time_
 #endif
     std::ostringstream stream;
     stream << std::put_time(&utc_tm, "%FT%TZ");
-    return stream.str();
-}
-
-std::string GenerateCorrelationId() {
-    std::random_device random_device;
-    std::mt19937 rng(random_device());
-    std::uniform_int_distribution<int> dist(0, 15);
-    std::ostringstream stream;
-    for (int i = 0; i < 32; ++i) {
-        stream << std::hex << dist(rng);
-    }
     return stream.str();
 }
 
@@ -86,7 +86,7 @@ bool PostJson(const std::string& url, const std::string& body) {
 }
 
 std::string BuildEndpoint(const agent::Config& config, const std::string& path) {
-    return config.transport_url + "/mtls/rmm" + path;
+    return config.transport_url + "/rmm" + path;
 }
 
 void AppendString(std::ostringstream& stream, const std::string& key, const std::string& value, bool trailing_comma = true) {
@@ -115,48 +115,31 @@ bool RmmTelemetryClient::SendConfigProfile(const RmmConfigProfile& profile) cons
     std::string correlation_id = GenerateCorrelationId();
     std::ostringstream payload;
     payload << '{';
-    AppendString(payload, "tenant_id", config_.tenant_id);
-    AppendString(payload, "asset_id", config_.asset_id);
-    AppendString(payload, "correlation_id", correlation_id);
-    AppendString(payload, "profile_id", profile.profile_id);
     AppendString(payload, "name", profile.name);
-    AppendString(payload, "version", profile.version);
-    AppendString(payload, "status", profile.status);
-    AppendString(payload, "checksum", profile.checksum);
-    AppendString(payload, "applied_at", BuildIsoTimestamp(profile.applied_at), false);
+    AppendString(payload, "profile_type", profile.profile_type);
+    AppendString(payload, "description", profile.description, false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/config-profiles"), payload.str());
+    bool ok = PostJson(BuildEndpoint(config_, "/configuration_profiles"), payload.str());
     LogOutcome("config_profile", correlation_id, ok);
     return ok;
 }
 
 bool RmmTelemetryClient::SendPatchCatalog(const std::vector<RmmPatchCatalogItem>& items) const {
     std::string correlation_id = GenerateCorrelationId();
-    std::ostringstream payload;
-    payload << '{';
-    AppendString(payload, "tenant_id", config_.tenant_id);
-    AppendString(payload, "asset_id", config_.asset_id);
-    AppendString(payload, "correlation_id", correlation_id);
-    AppendString(payload, "collected_at", BuildIsoTimestamp(std::chrono::system_clock::now()));
-    payload << "\"items\":[";
-    for (size_t i = 0; i < items.size(); ++i) {
-        const auto& item = items[i];
+    bool ok = true;
+    for (const auto& item : items) {
+        std::ostringstream payload;
         payload << '{';
-        AppendString(payload, "patch_id", item.patch_id);
-        AppendString(payload, "title", item.title);
         AppendString(payload, "vendor", item.vendor);
-        AppendString(payload, "severity", item.severity);
-        AppendString(payload, "kb", item.kb);
-        AppendString(payload, "release_date", item.release_date, false);
+        AppendString(payload, "product", item.product);
+        AppendString(payload, "patch_id", item.patch_id);
+        AppendString(payload, "release_date", item.release_date);
+        AppendInt(payload, "severity", item.severity, false);
         payload << '}';
-        if (i + 1 < items.size()) {
-            payload << ',';
-        }
-    }
-    payload << "]}";
 
-    bool ok = PostJson(BuildEndpoint(config_, "/patch-catalog"), payload.str());
+        ok = PostJson(BuildEndpoint(config_, "/patch_catalog"), payload.str()) && ok;
+    }
     LogOutcome("patch_catalog", correlation_id, ok);
     return ok;
 }
@@ -165,18 +148,12 @@ bool RmmTelemetryClient::SendPatchJob(const RmmPatchJob& job) const {
     std::string correlation_id = GenerateCorrelationId();
     std::ostringstream payload;
     payload << '{';
-    AppendString(payload, "tenant_id", config_.tenant_id);
-    AppendString(payload, "asset_id", config_.asset_id);
-    AppendString(payload, "correlation_id", correlation_id);
-    AppendString(payload, "job_id", job.job_id);
-    AppendString(payload, "patch_id", job.patch_id);
-    AppendString(payload, "status", job.status);
-    AppendString(payload, "result", job.result);
-    AppendString(payload, "scheduled_at", BuildIsoTimestamp(job.scheduled_at));
-    AppendString(payload, "applied_at", BuildIsoTimestamp(job.applied_at), false);
+    AppendString(payload, "psa_case_id", job.psa_case_id);
+    AppendString(payload, "scheduled_for", job.scheduled_for);
+    AppendString(payload, "reboot_policy", job.reboot_policy, false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/patch-jobs"), payload.str());
+    bool ok = PostJson(BuildEndpoint(config_, "/patch_jobs"), payload.str());
     LogOutcome("patch_job", correlation_id, ok);
     return ok;
 }
@@ -185,19 +162,14 @@ bool RmmTelemetryClient::SendScriptResult(const RmmScriptResult& result) const {
     std::string correlation_id = GenerateCorrelationId();
     std::ostringstream payload;
     payload << '{';
-    AppendString(payload, "tenant_id", config_.tenant_id);
-    AppendString(payload, "asset_id", config_.asset_id);
-    AppendString(payload, "correlation_id", correlation_id);
     AppendString(payload, "job_id", result.job_id);
-    AppendString(payload, "script_type", result.script_type);
+    AppendString(payload, "stdout", result.stdout_data);
+    AppendString(payload, "stderr", result.stderr_data);
     AppendInt(payload, "exit_code", result.exit_code);
-    AppendString(payload, "stdout_summary", result.stdout_summary);
-    AppendString(payload, "stderr_summary", result.stderr_summary);
-    AppendString(payload, "started_at", BuildIsoTimestamp(result.started_at));
-    AppendString(payload, "completed_at", BuildIsoTimestamp(result.completed_at), false);
+    AppendString(payload, "hash", result.hash, false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/script-results"), payload.str());
+    bool ok = PostJson(BuildEndpoint(config_, "/script_results"), payload.str());
     LogOutcome("script_result", correlation_id, ok);
     return ok;
 }
@@ -206,17 +178,12 @@ bool RmmTelemetryClient::SendRemoteSession(const RmmRemoteSession& session) cons
     std::string correlation_id = GenerateCorrelationId();
     std::ostringstream payload;
     payload << '{';
-    AppendString(payload, "tenant_id", config_.tenant_id);
-    AppendString(payload, "asset_id", config_.asset_id);
-    AppendString(payload, "correlation_id", correlation_id);
-    AppendString(payload, "session_id", session.session_id);
-    AppendString(payload, "operator_id", session.operator_id);
-    AppendString(payload, "status", session.status);
-    AppendString(payload, "started_at", BuildIsoTimestamp(session.started_at));
-    AppendString(payload, "ended_at", BuildIsoTimestamp(session.ended_at), false);
+    AppendString(payload, "asset_id", session.asset_id);
+    AppendString(payload, "initiated_by", session.initiated_by);
+    AppendString(payload, "session_type", session.session_type, false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/remote-sessions"), payload.str());
+    bool ok = PostJson(BuildEndpoint(config_, "/remote_sessions"), payload.str());
     LogOutcome("remote_session", correlation_id, ok);
     return ok;
 }
@@ -225,15 +192,12 @@ bool RmmTelemetryClient::SendEvidenceRecord(const RmmEvidenceRecord& record) con
     std::string correlation_id = GenerateCorrelationId();
     std::ostringstream payload;
     payload << '{';
-    AppendString(payload, "tenant_id", config_.tenant_id);
-    AppendString(payload, "asset_id", config_.asset_id);
-    AppendString(payload, "correlation_id", correlation_id);
-    AppendString(payload, "evidence_id", record.evidence_id);
+    AppendString(payload, "asset_id", record.asset_id);
     AppendString(payload, "evidence_type", record.evidence_type);
+    AppendString(payload, "related_entity", record.related_entity);
+    AppendString(payload, "related_id", record.related_id);
     AppendString(payload, "hash", record.hash);
     AppendString(payload, "storage_uri", record.storage_uri);
-    AppendString(payload, "related_id", record.related_id);
-    AppendString(payload, "captured_at", BuildIsoTimestamp(record.captured_at), false);
     payload << '}';
 
     bool ok = PostJson(BuildEndpoint(config_, "/evidence"), payload.str());
@@ -245,9 +209,7 @@ bool RmmTelemetryClient::SendDeviceInventory(const RmmDeviceInventory& inventory
     std::string correlation_id = GenerateCorrelationId();
     std::ostringstream payload;
     payload << '{';
-    AppendString(payload, "tenant_id", config_.tenant_id);
-    AppendString(payload, "asset_id", config_.asset_id);
-    AppendString(payload, "correlation_id", correlation_id);
+    AppendString(payload, "asset_id", inventory.asset_id);
     AppendString(payload, "hostname", inventory.hostname);
     AppendString(payload, "os_name", inventory.os_name);
     AppendString(payload, "os_version", inventory.os_version);
@@ -255,7 +217,7 @@ bool RmmTelemetryClient::SendDeviceInventory(const RmmDeviceInventory& inventory
     AppendString(payload, "collected_at", BuildIsoTimestamp(inventory.collected_at), false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/device-inventory"), payload.str());
+    bool ok = PostJson(BuildEndpoint(config_, "/device_inventory"), payload.str());
     LogOutcome("device_inventory", correlation_id, ok);
     return ok;
 }

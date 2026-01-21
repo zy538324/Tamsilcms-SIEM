@@ -1,8 +1,6 @@
 // Execution Service
 // Responsibilities: Script execution, patching, installs, config enforcement, remote ops
 #include <iostream>
-#include <iomanip>
-#include <sstream>
 #include "agent_config.h"
 #include "agent_execution.h"
 #include "../../include/agent_rmm.h"
@@ -64,44 +62,34 @@ int main(int argc, char* argv[]) {
     auto completed_at = result.completed_at;
 
     agent_rmm::RmmConfigProfile profile{};
-    profile.profile_id = "profile-baseline";
     profile.name = "Baseline Security Profile";
-    profile.version = "2024.04";
-    profile.status = "applied";
-    profile.checksum = "sha256:placeholder";
-    profile.applied_at = started_at;
+    profile.profile_type = "hardening";
+    profile.description = "Default hardening profile applied by the agent.";
     rmm_client.SendConfigProfile(profile);
 
     std::vector<agent_rmm::RmmPatchCatalogItem> catalog{
-        {"patch-001", "Windows Security Update", "Microsoft", "critical", "KB5010001", "2024-04-01"}
+        {"Microsoft", "Windows", "patch-001", "2024-04-01", 4}
     };
     rmm_client.SendPatchCatalog(catalog);
 
     agent_rmm::RmmPatchJob patch_job{};
-    patch_job.job_id = "patch-job-001";
-    patch_job.patch_id = "patch-001";
-    patch_job.status = "completed";
-    patch_job.result = "installed";
-    patch_job.scheduled_at = started_at;
-    patch_job.applied_at = completed_at;
+    patch_job.psa_case_id = "";
+    patch_job.scheduled_for = "2024-04-01T09:00:00Z";
+    patch_job.reboot_policy = "if_required";
     rmm_client.SendPatchJob(patch_job);
 
     agent_rmm::RmmScriptResult script_result{};
     script_result.job_id = job.job_id;
-    script_result.script_type = job.script_type;
+    script_result.stdout_data = result.stdout_data;
+    script_result.stderr_data = result.stderr_data;
     script_result.exit_code = result.exit_code;
-    script_result.stdout_summary = result.stdout_data;
-    script_result.stderr_summary = result.stderr_data;
-    script_result.started_at = started_at;
-    script_result.completed_at = completed_at;
+    script_result.hash = "sha256:placeholder";
     rmm_client.SendScriptResult(script_result);
 
     agent_rmm::RmmRemoteSession session{};
-    session.session_id = "session-001";
-    session.operator_id = "operator-local";
-    session.status = "closed";
-    session.started_at = started_at;
-    session.ended_at = completed_at;
+    session.asset_id = config.asset_id;
+    session.initiated_by = "operator-local";
+    session.session_type = "support";
     rmm_client.SendRemoteSession(session);
     std::cout << "Execution Service started. Example script job run." << std::endl;
     // TODO: Validate PSA authorisation, command signing, scope, safety

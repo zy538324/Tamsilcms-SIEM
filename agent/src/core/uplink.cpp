@@ -152,6 +152,9 @@ bool UploadEvidencePackage(const std::string& package_dir) {
     if (asset_id.empty()) {
         asset_id = source.empty() ? "agent-local" : source;
     }
+    if (asset_id.size() < 3) {
+        asset_id = "agent-local";
+    }
     if (related_id.empty()) {
         related_id = evidence_id;
     }
@@ -161,7 +164,7 @@ bool UploadEvidencePackage(const std::string& package_dir) {
         json_package_dir.replace(pos, 1, "\\\\");
     }
     std::string json = "{";
-    if (tenant_id.empty()) {
+    if (tenant_id.empty() || tenant_id.size() < 3) {
         tenant_id = "tamsil-agent";
     }
     json += "\"tenant_id\":\"" + tenant_id + "\",";
@@ -174,9 +177,17 @@ bool UploadEvidencePackage(const std::string& package_dir) {
     json += "\"time_sensitivity\":\"none\",";
     json += "\"system_recommendation\":null,";
     json += "\"evidence\":[{";
+    std::string linked_object_id = related_id;
+    if (linked_object_id.size() < 3) {
+        linked_object_id = evidence_id;
+    }
+    if (linked_object_id.size() < 3) {
+        linked_object_id = "ev-" + evidence_id;
+    }
+    std::string immutable_reference = evidence_id.size() < 3 ? "ev-" + evidence_id : evidence_id;
     json += "\"linked_object_type\":\"finding\",";
-    json += "\"linked_object_id\":\"" + related_id + "\",";
-    json += "\"immutable_reference\":\"" + evidence_id + "\",";
+    json += "\"linked_object_id\":\"" + linked_object_id + "\",";
+    json += "\"immutable_reference\":\"" + immutable_reference + "\",";
     json += "\"payload\":{";
     json += "\"hash\":\"" + hash + "\",";
     // include stored_uri as the package path

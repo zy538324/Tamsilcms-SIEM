@@ -102,12 +102,12 @@ void EvidenceBroker::UploadEvidence(const std::string& evidence_id) {
 
             agent_rmm::RmmTelemetryClient rmm_client(config);
             agent_rmm::RmmEvidenceRecord record{};
-            record.evidence_id = it.evidence_id;
+            record.asset_id = config.asset_id;
             record.evidence_type = it.type;
+            record.related_entity = "agent";
+            record.related_id = it.related_id.empty() ? it.evidence_id : it.related_id;
             record.hash = it.hash;
             record.storage_uri = "file://" + outdir.string();
-            record.related_id = it.related_id;
-            record.captured_at = it.captured_at;
             rmm_client.SendEvidenceRecord(record);
 
             // Upload via uplink
