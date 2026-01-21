@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from .config import Settings, load_settings
+
 from .certificates import CertificateRecord, registry
 from .agents import AgentState, store as agent_store
 from .events import HeartbeatEvent, store

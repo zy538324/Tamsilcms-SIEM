@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from .config import Settings, load_settings
+
 from .engine import build_dispatch_records, build_evidence_payload, hash_payload, normalise_observations
 from .models import (
     AbortTestRequest,

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Iterable
 
-from .config import Settings
+
 from .models import DetectionResponseSummary, Observation, PenTestPlan, PenTestCreateRequest, ResultIngestRequest, Safeguards
 
 
