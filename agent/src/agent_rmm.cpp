@@ -172,6 +172,10 @@ bool RmmTelemetryClient::SendPatchJob(const RmmPatchJob& job) const {
     AppendString(payload, "patch_id", job.patch_id);
     AppendString(payload, "status", job.status);
     AppendString(payload, "result", job.result);
+    AppendInt(payload, "exit_code", job.exit_code);
+    AppendString(payload, "stdout_summary", job.stdout_summary);
+    AppendString(payload, "stderr_summary", job.stderr_summary);
+    payload << "\"reboot_required\":" << (job.reboot_required ? "true" : "false") << ",";
     AppendString(payload, "scheduled_at", BuildIsoTimestamp(job.scheduled_at));
     AppendString(payload, "applied_at", BuildIsoTimestamp(job.applied_at), false);
     payload << '}';

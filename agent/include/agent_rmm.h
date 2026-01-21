@@ -33,6 +33,10 @@ struct RmmPatchJob {
     std::string patch_id;
     std::string status;
     std::string result;
+    int exit_code = 0;
+    bool reboot_required = false;
+    std::string stdout_summary;
+    std::string stderr_summary;
     std::chrono::system_clock::time_point scheduled_at;
     std::chrono::system_clock::time_point applied_at;
 };
