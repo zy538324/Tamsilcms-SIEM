@@ -109,11 +109,13 @@ Config LoadConfig() {
     }
     config.trust_state = GetIniOrEnv(ini, "trust_state", "AGENT_TRUST_STATE", "bootstrap");
     config.shared_key = GetIniOrEnv(ini, "shared_key", "AGENT_HMAC_SHARED_KEY", "");
+    config.api_key = GetIniOrEnv(ini, "api_key", "AGENT_API_KEY", "");
     config.cert_fingerprint = GetIniOrEnv(ini, "cert_fingerprint", "AGENT_CERT_FINGERPRINT", "sha256:placeholder");
     config.identity_header = GetIniOrEnv(ini, "identity_header", "AGENT_IDENTITY", "agent-placeholder");
     config.heartbeat_interval_seconds = std::stoi(GetIniOrEnv(ini, "heartbeat_interval_seconds", "AGENT_HEARTBEAT_INTERVAL", "45"));
     config.watchdog_timeout_seconds = std::stoi(GetIniOrEnv(ini, "watchdog_timeout_seconds", "AGENT_WATCHDOG_TIMEOUT", "120"));
     config.max_heartbeat_interval_seconds = std::stoi(GetIniOrEnv(ini, "max_heartbeat_interval_seconds", "AGENT_HEARTBEAT_MAX_INTERVAL", "300"));
+    config.patch_poll_interval_seconds = std::stoi(GetIniOrEnv(ini, "patch_poll_interval_seconds", "AGENT_PATCH_POLL_INTERVAL", "30"));
     config.expected_binary_hash = GetIniOrEnv(ini, "expected_binary_hash", "AGENT_EXPECTED_SHA256", "");
     return config;
 }
