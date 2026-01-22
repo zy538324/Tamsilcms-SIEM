@@ -74,15 +74,29 @@ async def _proxy_request(service: str, request: Request) -> Response:
         for key, value in request.headers.items()
         if key.lower() not in {"host", "content-length"}
     }
+    headers.setdefault("X-Forwarded-Proto", "https")
+    service_api_key = os.environ.get(f"API_{service.upper()}_API_KEY")
+    if service_api_key and "X-API-Key" not in headers:
+        headers["X-API-Key"] = service_api_key
 
     body = await request.body()
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        upstream_response = await client.request(
-            method=request.method,
-            url=upstream_url,
-            headers=headers,
-            content=body or None,
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            upstream_response = await client.request(
+                method=request.method,
+                url=upstream_url,
+                headers=headers,
+                content=body or None,
+            )
+    except httpx.RequestError:
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={
+                "detail": "upstream_unreachable",
+                "service": service,
+                "upstream_url": upstream_url,
+            },
         )
 
     response_headers: Dict[str, str] = {}
