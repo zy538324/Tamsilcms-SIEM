@@ -14,6 +14,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 
 from .config import Settings, load_settings
@@ -22,6 +23,8 @@ from .agents import AgentState, store as agent_store
 from .events import HeartbeatEvent, store
 from .online import evaluate_presence
 from .risk import store as risk_store
+from .db import get_db, init_db
+from .db_models import AgentRecord, HeartbeatRecord, RiskScoreRecord
 from .models import (
     CertificateIssueRequest,
     CertificateIssueResponse,
@@ -67,6 +70,12 @@ app.add_middleware(
 def get_settings() -> Settings:
     """Dependency to load settings once per request."""
     return load_settings()
+
+
+@app.on_event("startup")
+async def startup_db() -> None:
+    """Initialise identity database tables on startup."""
+    init_db()
 
 
 async def enforce_https(request: Request) -> None:
@@ -200,6 +209,40 @@ def _validate_scope_enabled(settings: Settings, tenant_id: str, asset_id: str) -
         )
 
 
+def _upsert_agent(db: Session, identity_id: str, hostname: str, os_name: str, trust_state: str, last_seen_at: datetime) -> None:
+    record = db.get(AgentRecord, identity_id)
+    if record:
+        record.hostname = hostname
+        record.os = os_name
+        record.last_seen_at = last_seen_at
+        record.trust_state = trust_state
+    else:
+        db.add(
+            AgentRecord(
+                identity_id=identity_id,
+                hostname=hostname,
+                os=os_name,
+                last_seen_at=last_seen_at,
+                trust_state=trust_state,
+            )
+        )
+
+
+def _upsert_risk_score(db: Session, identity_id: str, score: float, rationale: str) -> None:
+    record = db.get(RiskScoreRecord, identity_id)
+    if record:
+        record.score = score
+        record.rationale = rationale
+    else:
+        db.add(
+            RiskScoreRecord(
+                identity_id=identity_id,
+                score=score,
+                rationale=rationale,
+            )
+        )
+
+
 @app.get("/health", response_class=JSONResponse)
 async def health_check(settings: Settings = Depends(get_settings)) -> dict:
     """Simple health endpoint for load balancers."""
@@ -207,6 +250,42 @@ async def health_check(settings: Settings = Depends(get_settings)) -> dict:
         "status": "ok",
         "service": settings.service_name,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/status", response_class=JSONResponse)
+async def status_check(
+    settings: Settings = Depends(get_settings),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Expose in-memory store counts for diagnostics."""
+    heartbeats = (
+        db.query(HeartbeatRecord)
+        .order_by(HeartbeatRecord.received_at.desc())
+        .limit(100)
+        .all()
+    )
+    agents = db.query(AgentRecord).all()
+    scores = db.query(RiskScoreRecord).all()
+    last_heartbeat_at = max(
+        (event.received_at for event in heartbeats),
+        default=None,
+    )
+    last_agent_seen_at = max(
+        (agent.last_seen_at for agent in agents),
+        default=None,
+    )
+
+    return {
+        "service": settings.service_name,
+        "storage": "postgres",
+        "counts": {
+            "heartbeats": len(heartbeats),
+            "agents": len(agents),
+            "risk_scores": len(scores),
+        },
+        "last_heartbeat_at": last_heartbeat_at.isoformat() if last_heartbeat_at else None,
+        "last_agent_seen_at": last_agent_seen_at.isoformat() if last_agent_seen_at else None,
     }
 
 
@@ -222,6 +301,7 @@ async def hello(
         None, alias="X-Client-Cert-Sha256"
     ),
     _: None = Depends(enforce_https),
+    db: Session = Depends(get_db),
 ) -> HelloResponse:
     """Accept a signed hello payload and verify its authenticity.
 
@@ -269,6 +349,7 @@ async def hello(
             detail=reason,
         )
 
+    received_at = datetime.now(timezone.utc)
     store.record(
         HeartbeatEvent(
             event_id=payload.event_id,
@@ -277,7 +358,7 @@ async def hello(
             os=payload.os,
             uptime_seconds=payload.uptime_seconds,
             trust_state=payload.trust_state,
-            received_at=datetime.now(timezone.utc),
+            received_at=received_at,
         )
     )
     agent_store.upsert(
@@ -291,6 +372,32 @@ async def hello(
         score=0.0,
         rationale="baseline",
     )
+    db.add(
+        HeartbeatRecord(
+            event_id=payload.event_id,
+            agent_id=payload.identity_id,
+            hostname=payload.hostname,
+            os=payload.os,
+            uptime_seconds=payload.uptime_seconds,
+            trust_state=payload.trust_state,
+            received_at=received_at,
+        )
+    )
+    _upsert_agent(
+        db,
+        identity_id=payload.identity_id,
+        hostname=payload.hostname,
+        os_name=payload.os,
+        trust_state=payload.trust_state,
+        last_seen_at=received_at,
+    )
+    _upsert_risk_score(
+        db,
+        identity_id=payload.identity_id,
+        score=0.0,
+        rationale="baseline",
+    )
+    db.commit()
 
     return HelloResponse(
         status="verified",
@@ -623,9 +730,14 @@ async def record_task_result(
 
 
 @app.get("/heartbeats", response_model=list[HeartbeatEventResponse])
-async def list_heartbeats() -> list[HeartbeatEventResponse]:
+async def list_heartbeats(db: Session = Depends(get_db)) -> list[HeartbeatEventResponse]:
     """Return recent heartbeat events (in-memory)."""
-    events = store.list_recent()
+    events = (
+        db.query(HeartbeatRecord)
+        .order_by(HeartbeatRecord.received_at.desc())
+        .limit(100)
+        .all()
+    )
     return [
         HeartbeatEventResponse(
             event_id=event.event_id,
@@ -641,9 +753,9 @@ async def list_heartbeats() -> list[HeartbeatEventResponse]:
 
 
 @app.get("/agents", response_model=list[AgentStateResponse])
-async def list_agents() -> list[AgentStateResponse]:
+async def list_agents(db: Session = Depends(get_db)) -> list[AgentStateResponse]:
     """Return current agent states (in-memory)."""
-    agents = agent_store.list_all()
+    agents = db.query(AgentRecord).all()
     return [
         AgentStateResponse(
             identity_id=agent.identity_id,
@@ -657,10 +769,25 @@ async def list_agents() -> list[AgentStateResponse]:
 
 
 @app.get("/agents/presence", response_model=list[AgentPresenceResponse])
-async def list_agent_presence(settings: Settings = Depends(get_settings)) -> list[AgentPresenceResponse]:
+async def list_agent_presence(
+    settings: Settings = Depends(get_settings),
+    db: Session = Depends(get_db),
+) -> list[AgentPresenceResponse]:
     """Return agent online/offline presence based on last seen timestamp."""
-    agents = agent_store.list_all()
-    presence = evaluate_presence(agents, settings.heartbeat_offline_threshold_seconds)
+    agents = [
+        AgentState(
+            identity_id=agent.identity_id,
+            hostname=agent.hostname,
+            os=agent.os,
+            last_seen_at=agent.last_seen_at,
+            trust_state=agent.trust_state,
+        )
+        for agent in db.query(AgentRecord).all()
+    ]
+    presence = evaluate_presence(
+        agents,
+        settings.heartbeat_offline_threshold_seconds,
+    )
     return [
         AgentPresenceResponse(
             identity_id=agent.identity_id,
@@ -675,9 +802,9 @@ async def list_agent_presence(settings: Settings = Depends(get_settings)) -> lis
 
 
 @app.get("/risk-scores", response_model=list[RiskScoreResponse])
-async def list_risk_scores() -> list[RiskScoreResponse]:
+async def list_risk_scores(db: Session = Depends(get_db)) -> list[RiskScoreResponse]:
     """Return current risk scores (in-memory)."""
-    scores = risk_store.list_all()
+    scores = db.query(RiskScoreRecord).all()
     return [
         RiskScoreResponse(
             identity_id=score.identity_id,
