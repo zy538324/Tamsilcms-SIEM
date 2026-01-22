@@ -3,6 +3,7 @@
 // For dev and testing you can override any service with an explicit Vite env var,
 // e.g. `VITE_PSA_BASE_URL`, `VITE_EDR_BASE_URL`, `VITE_INGESTION_BASE_URL`.
 const defaultTransportBase = "/transport";
+const defaultServiceBase = "/";
 
 const sanitisePath = (path: string) => path.replace(/^\/+/, "");
 
@@ -31,14 +32,12 @@ export const resolveServiceBaseUrl = (service: string) => {
       vulnerability: 8004,
       auditing: 8010,
       rmm: 8020,
-      detection: 8030,
-      compliance: 8031,
     };
     if (devPorts[service]) {
       return `http://localhost:${devPorts[service]}`;
     }
   }
-  return resolveTransportBaseUrl();
+  return defaultServiceBase;
 };
 
 export const buildCoreServiceUrl = (service: string, path: string, baseUrl?: string) => {
@@ -47,20 +46,26 @@ export const buildCoreServiceUrl = (service: string, path: string, baseUrl?: str
   const normalisedService = sanitisePath(service).replace(/\/$/, "");
   const normalisedPath = path ? `/${sanitisePath(path)}` : "";
   const isAbsoluteBase = /^https?:\/\//i.test(normalisedBase);
-  if (isAbsoluteBase && normalisedBase.endsWith("/transport")) {
-    return `${normalisedBase}/${normalisedService}${normalisedPath}`;
+  if (!normalisedBase) {
+    return normalisedPath;
   }
-  if (isAbsoluteBase && service === "identity") {
-    return `${normalisedBase}${normalisedPath}`;
+  const baseWithoutService = normalisedBase.endsWith(`/${normalisedService}`)
+    ? normalisedBase.slice(0, -1 * (normalisedService.length + 1))
+    : normalisedBase;
+  if (isAbsoluteBase && baseWithoutService.endsWith("/transport")) {
+    return `${baseWithoutService}/${normalisedService}${normalisedPath}`;
   }
   if (isAbsoluteBase) {
-    return `${normalisedBase}${normalisedPath}`;
+    return `${baseWithoutService}${normalisedPath}`;
+  }
+  if (baseWithoutService.endsWith("/transport")) {
+    return `${baseWithoutService}/${normalisedService}${normalisedPath}`;
+  }
+  if (baseWithoutService) {
+    return `${baseWithoutService}${normalisedPath}`;
   }
   // If base already points to a specific service root, avoid duplicating service in path.
-  if (normalisedBase.endsWith(`/${normalisedService}`)) {
-    return `${normalisedBase}${normalisedPath}`;
-  }
-  return `${normalisedBase}/${normalisedService}${normalisedPath}`;
+  return `/${normalisedService}${normalisedPath}`;
 };
 
 export const fetchCoreService = async <T>(
