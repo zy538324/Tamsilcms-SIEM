@@ -1,15 +1,23 @@
 use std::time::Duration;
 
-use serde::Deserialize;
 use tokio::signal;
 use tracing::{info, warn};
 
-#[derive(Debug, Deserialize)]
-struct CoreConfig {
-    asset_id: String,
-    agent_id: String,
-    ipc_pipe_name: String,
-}
+mod compliance;
+mod config;
+mod evidence;
+mod identity;
+mod ipc;
+mod policy;
+mod rate_limit;
+mod update;
+
+use crate::compliance::run_self_audit;
+use crate::config::CoreConfig;
+use crate::identity::{verify_trust_bundle, AgentIdentity};
+use crate::ipc::IpcServer;
+use crate::policy::PolicyBundle;
+use crate::rate_limit::RateLimiter;
 
 #[tokio::main]
 async fn main() {
@@ -17,18 +25,24 @@ async fn main() {
         .with_env_filter("info")
         .init();
 
-    let config = CoreConfig {
-        asset_id: "asset-placeholder".to_string(),
-        agent_id: "agent-core".to_string(),
-        ipc_pipe_name: r"\\.\pipe\tamsilcms-agent-core".to_string(),
-    };
+    let config = CoreConfig::placeholder();
+    let identity = AgentIdentity::new(config.asset_id.clone(), config.agent_id.clone());
 
-    info!(asset_id = %config.asset_id, agent_id = %config.agent_id, "agent core starting");
-    warn!("placeholder: load config, establish trust, and start IPC listeners");
+    info!(asset_id = %identity.asset_id, agent_id = %identity.agent_id, "agent core starting");
 
-    // TODO: Load configuration from disk/env, validate policies, and initialise trust.
-    // TODO: Start IPC listeners for sensor/exec/user-helper services.
-    // TODO: Enforce rate limits and schema validation on all inbound messages.
+    verify_trust_bundle();
+
+    let policy = PolicyBundle::placeholder();
+    if !policy.validate() {
+        warn!("policy validation failed; refusing to start services");
+        return;
+    }
+
+    let rate_limiter = RateLimiter::new(600);
+    let ipc_server = IpcServer::new(config.ipc_pipe_name.clone(), config.max_payload_bytes, rate_limiter);
+    ipc_server.start();
+
+    let _compliance_results = run_self_audit();
 
     loop {
         tokio::select! {
