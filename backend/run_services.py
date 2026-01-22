@@ -28,6 +28,12 @@ from typing import Dict, Optional
 ROOT = Path(__file__).resolve().parent
 
 SERVICES: Dict[str, Dict] = {
+    "api": {
+        "path": ROOT,
+        "port": 8080,
+        "module": "api:app",
+        "env": {},
+    },
     "identity": {
         "path": ROOT / "core-services" / "identity",
         "port": 8085,
@@ -156,6 +162,7 @@ def find_venv_python(service_path: Path) -> Optional[str]:
 async def run_service(name: str, cfg: Dict, reload: bool) -> asyncio.subprocess.Process:
     service_path: Path = cfg["path"]
     port: int = cfg["port"]
+    module: str = cfg.get("module", "app.main:app")
     env: Dict[str, str] = os.environ.copy()
 
     # Apply root .env defaults (lowest precedence)
@@ -183,7 +190,7 @@ async def run_service(name: str, cfg: Dict, reload: bool) -> asyncio.subprocess.
     python_exe = find_venv_python(service_path) or sys.executable
 
     host = os.environ.get(f"{name.upper()}_HOST", "127.0.0.1")
-    cmd = [python_exe, "-m", "uvicorn", "app.main:app", "--host", host, "--port", str(port)]
+    cmd = [python_exe, "-m", "uvicorn", module, "--host", host, "--port", str(port)]
     if reload:
         cmd.append("--reload")
 
