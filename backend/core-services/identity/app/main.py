@@ -69,6 +69,53 @@ def get_settings() -> Settings:
     return load_settings()
 
 
+def _seed_development_data(settings: Settings) -> None:
+    """Seed demo data for local development if enabled.
+
+    This helps UI screens render without a connected agent pipeline.
+    """
+    if not settings.dev_seed_enabled:
+        return
+    if agent_store.list_all():
+        return
+    now = datetime.now(timezone.utc)
+    demo_identity_id = "agent-dev-001"
+    demo_hostname = "dev-host-01"
+    demo_os = "linux"
+    demo_trust_state = "trusted"
+    demo_uptime_seconds = 128_000
+
+    store.record(
+        HeartbeatEvent(
+            event_id="heartbeat-dev-001",
+            agent_id=demo_identity_id,
+            hostname=demo_hostname,
+            os=demo_os,
+            uptime_seconds=demo_uptime_seconds,
+            trust_state=demo_trust_state,
+            received_at=now,
+        )
+    )
+    agent_store.upsert(
+        identity_id=demo_identity_id,
+        hostname=demo_hostname,
+        os_name=demo_os,
+        trust_state=demo_trust_state,
+    )
+    risk_store.upsert(
+        identity_id=demo_identity_id,
+        score=0.1,
+        rationale="development_seed",
+    )
+
+
+@app.on_event("startup")
+async def startup_seed() -> None:
+    """Seed development data on startup when configured."""
+    settings = load_settings()
+    _seed_development_data(settings)
+
+
 async def enforce_https(request: Request) -> None:
     """Reject non-HTTPS requests.
 

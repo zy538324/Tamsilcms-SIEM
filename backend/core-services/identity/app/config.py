@@ -18,6 +18,7 @@ class Settings:
 	task_max_ttl_seconds: int
 	tasks_disabled_tenants: tuple[str, ...]
 	tasks_disabled_assets: tuple[str, ...]
+	dev_seed_enabled: bool
 
 def load_settings() -> Settings:
 	allowlist = tuple(
@@ -50,4 +51,5 @@ def load_settings() -> Settings:
 		task_max_ttl_seconds=int(os.environ.get("IDENTITY_TASK_MAX_TTL", "900")),
 		tasks_disabled_tenants=disabled_tenants,
 		tasks_disabled_assets=disabled_assets,
+		dev_seed_enabled=os.environ.get("IDENTITY_DEV_SEED", "false").lower() == "true",
 	)
