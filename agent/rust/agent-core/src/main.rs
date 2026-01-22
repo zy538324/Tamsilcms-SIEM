@@ -11,6 +11,7 @@ mod evidence;
 mod identity;
 mod ipc;
 mod ipc_validation;
+mod pipeline;
 mod policy;
 mod rate_limit;
 mod rmm;
@@ -26,6 +27,7 @@ use crate::config::CoreConfig;
 use crate::edr::evaluate_rules;
 use crate::identity::{verify_trust_bundle, AgentIdentity};
 use crate::ipc::IpcServer;
+use crate::pipeline::PipelineStatus;
 use crate::policy::PolicyBundle;
 use crate::rate_limit::RateLimiter;
 use crate::rmm::queue_execution_request;
@@ -83,6 +85,13 @@ async fn main() {
         command_id: "cmd-placeholder".to_string(),
         payload: "payload-placeholder".to_string(),
     });
+
+    let mut pipeline_status = PipelineStatus::new();
+    pipeline_status.mark_edr_ready();
+    pipeline_status.mark_siem_ready();
+    pipeline_status.mark_rmm_ready();
+    pipeline_status.mark_vulnerability_ready();
+    info!(ready = pipeline_status.is_fully_ready(), "pipeline status initialised");
 
     loop {
         tokio::select! {
