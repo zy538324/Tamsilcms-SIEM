@@ -18,8 +18,25 @@ export const resolveServiceBaseUrl = (service: string) => {
   // prefer explicit per-service env var, then fall back to transport gateway
   const explicit = envBaseFor(service);
   if (explicit) return explicit;
-  if (service === "identity" && import.meta.env.DEV) {
-    return "http://localhost:8085";
+  if (import.meta.env.DEV) {
+    const devPorts: Record<string, number> = {
+      identity: 8085,
+      transport: 8081,
+      ingestion: 8000,
+      patch: 8082,
+      penetration: 8083,
+      psa: 8001,
+      siem: 8002,
+      edr: 8003,
+      vulnerability: 8004,
+      auditing: 8010,
+      rmm: 8020,
+      detection: 8030,
+      compliance: 8031,
+    };
+    if (devPorts[service]) {
+      return `http://localhost:${devPorts[service]}`;
+    }
   }
   return resolveTransportBaseUrl();
 };
@@ -30,7 +47,13 @@ export const buildCoreServiceUrl = (service: string, path: string, baseUrl?: str
   const normalisedService = sanitisePath(service).replace(/\/$/, "");
   const normalisedPath = path ? `/${sanitisePath(path)}` : "";
   const isAbsoluteBase = /^https?:\/\//i.test(normalisedBase);
+  if (isAbsoluteBase && normalisedBase.endsWith("/transport")) {
+    return `${normalisedBase}/${normalisedService}${normalisedPath}`;
+  }
   if (isAbsoluteBase && service === "identity") {
+    return `${normalisedBase}${normalisedPath}`;
+  }
+  if (isAbsoluteBase) {
     return `${normalisedBase}${normalisedPath}`;
   }
   // If base already points to a specific service root, avoid duplicating service in path.
@@ -50,10 +73,6 @@ export const fetchCoreService = async <T>(
   const response = await fetch(url, {
     method: "GET",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Forwarded-Proto": "https",
-    },
     signal,
   });
 
