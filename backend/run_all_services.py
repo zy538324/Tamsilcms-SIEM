@@ -27,6 +27,8 @@ extra_services = {
     "vulnerability": {"path": ROOT / "core-services" / "vulnerability", "port": 8004, "env": {}},
     "auditing": {"path": ROOT / "core-services" / "auditing", "port": 8010, "env": {}},
     "rmm": {"path": ROOT / "core-services" / "rmm", "port": 8020, "env": {}},
+    "detection": {"path": ROOT / "core-services" / "detection", "port": 8030, "env": {}},
+    "compliance": {"path": ROOT / "core-services" / "compliance", "port": 8031, "env": {}},
 }
 
 # Merge extras into the existing SERVICES map without overwriting
