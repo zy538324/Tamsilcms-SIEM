@@ -8,6 +8,7 @@ mod config;
 mod evidence;
 mod identity;
 mod ipc;
+mod ipc_validation;
 mod policy;
 mod rate_limit;
 mod update;
@@ -25,7 +26,7 @@ async fn main() {
         .with_env_filter("info")
         .init();
 
-    let config = CoreConfig::placeholder();
+    let config = CoreConfig::from_env();
     let identity = AgentIdentity::new(config.asset_id.clone(), config.agent_id.clone());
 
     info!(asset_id = %identity.asset_id, agent_id = %identity.agent_id, "agent core starting");
