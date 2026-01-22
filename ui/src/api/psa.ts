@@ -23,11 +23,11 @@ export type TicketResponse = {
 
 // PSA workflow service for ticketed actions and evidence linkage.
 export const fetchTickets = async (signal?: AbortSignal): Promise<PsaTicketRecord[]> => {
-  const response = await fetchCoreService<TicketListResponse>("psa", "/cases", signal);
-  return response.tickets ?? response.cases ?? [];
+  const response = await fetchCoreService<TicketListResponse>("psa", "/tickets", signal);
+  return response.tickets ?? [];
 };
 
 export const fetchTicket = async (ticketId: string, signal?: AbortSignal): Promise<PsaTicketRecord> => {
-  const response = await fetchCoreService<TicketResponse>("psa", `/cases/${encodeURIComponent(ticketId)}`, signal);
-  return response.ticket ?? response.case ?? (response as any);
+  const response = await fetchCoreService<TicketResponse>("psa", `/tickets/${encodeURIComponent(ticketId)}`, signal);
+  return response.ticket ?? (response as PsaTicketRecord);
 };

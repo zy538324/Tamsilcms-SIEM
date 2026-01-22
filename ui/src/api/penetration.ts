@@ -12,7 +12,7 @@ export type PenTestApiResponse = {
 };
 
 export const fetchPenTests = async (signal?: AbortSignal): Promise<PenTestApiResponse> => {
-  return fetchCoreService<PenTestApiResponse>("pentest", "/tests", signal);
+  return fetchCoreService<PenTestApiResponse>("penetration", "/tests", signal);
 };
 
 export type PenTestDetailResponse = {
@@ -35,5 +35,5 @@ export const fetchPenTest = async (
   testId: string,
   signal?: AbortSignal
 ): Promise<PenTestDetailResponse> => {
-  return fetchCoreService<PenTestDetailResponse>("pentest", `/tests/${encodeURIComponent(testId)}`, signal);
+  return fetchCoreService<PenTestDetailResponse>("penetration", `/tests/${encodeURIComponent(testId)}`, signal);
 };
