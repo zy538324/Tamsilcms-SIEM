@@ -1,16 +1,21 @@
 # Agent IPC & Message Schemas
 
 All agent services communicate via:
-- Named pipes
-- Shared memory (with ACLs)
-- Strict message schemas (protobuf or flat structs)
+- Named pipes with strict ACLs
+- Versioned, typed schemas (Protobuf or FlatBuffers)
+- No raw JSON blobs
 
-## Message Types
-- TelemetryEnvelope
-- DetectionReport
+## Transport rules
+- Only agent-core can connect to provider services
+- No shared memory without explicit, versioned schemas
+- All payloads include size limits and schema versions
+
+## Message types (examples)
+- SensorEvent
+- ExecutionCommand
 - ExecutionResult
 - EvidencePackage
 - HealthHeartbeat
 - ComplianceAssertion
 
-No raw JSON blobs. All messages are typed and versioned.
+Canonical schemas live in `proto/agent_ipc.proto`. C++ and Rust consume generated code, never handwritten structs.
