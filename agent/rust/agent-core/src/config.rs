@@ -15,7 +15,7 @@ impl CoreConfig {
         Self {
             asset_id: "asset-placeholder".to_string(),
             agent_id: "agent-core".to_string(),
-            ipc_pipe_name: r"\\.\pipe\tamsilcms-agent-core".to_string(),
+            ipc_pipe_name: r"\\.\pipe\tamsil_agent_pipe".to_string(),
             max_payload_bytes: 1024 * 1024,
         }
     }
