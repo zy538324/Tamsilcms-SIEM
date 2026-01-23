@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::ipc_validation::{validate_payload_size, validate_schema_version, EnvelopeMeta};
+use crate::ipc_validation::{validate_payload_size, validate_proto_envelope, validate_schema_version, EnvelopeMeta};
 use crate::rate_limit::RateLimiter;
 
 pub const IPC_SCHEMA_VERSION: u32 = 1;
@@ -37,5 +37,9 @@ impl IpcServer {
     pub fn start(&self) {
         // TODO: Bind to named pipe, accept only authorised clients, and decode protobuf messages.
         // TODO: Validate schema version, size, and required fields before routing.
+    }
+
+    pub fn validate_proto(&self, envelope: &crate::proto::agent_ipc::Envelope) -> bool {
+        validate_proto_envelope(envelope, IPC_SCHEMA_VERSION, self.max_payload_bytes)
     }
 }
