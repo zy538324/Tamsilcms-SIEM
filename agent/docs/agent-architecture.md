@@ -1,103 +1,248 @@
-# Agent Architecture (Production-Grade Endpoint Substrate)
+# Agent Architecture (Rust Core + C++ Capabilities)
 
 ## Overview
-This document describes the multi-service hostile-environment agent for SIEM, EDR, Vulnerability Management, Pen Testing, Compliance, and RMM. The agent is Windows-first, but portable, and strictly adheres to institutional control principles.
+This document defines the Windows-first, multi-service endpoint agent designed for SIEM, EDR, vulnerability management, compliance auditing, and RMM. The agent assumes hostile environments and audit scrutiny: authority is centralised in Rust, unsafe capabilities are isolated in C++.
 
-## Service Layout
-- **Agent Core Service**: Orchestrates identity, config, module registry, telemetry, evidence, uplink.
-- **Sensor Service**: Captures process, file, registry, network, and user events. Emits facts only.
-- **Execution Service**: Executes scripts, patches, installs, and remote ops. Strictly gated.
-- **User Interaction Helper**: Optional, runs in user context for UI and notifications.
-- **Watchdog Service**: Monitors agent health, restarts, and anti-tamper.
+## Responsibility Split (Non-negotiable)
 
-## IPC & Boundaries
-- Named pipes, shared memory (ACLs), strict message schemas (see ipc/messages.h).
-- No service trusts another blindly.
+### Rust (Agent Core, “the brain”)
+Rust is responsible for:
+- Agent identity and cryptographic trust
+- Secure communication (mTLS, certificate pinning)
+- Policy ingestion and validation
+- Module orchestration
+- IPC validation and routing
+- Evidence packaging and hashing
+- Compliance self-audit logic
+- Update lifecycle
+- Rate limiting and safety controls
+- All parsing of untrusted input
 
-## Subsystems
-- Identity & Trust
-- Config Manager
-- Module Registry
-- Telemetry Router
-- Command Dispatcher
-- Evidence Broker
+Rust never:
+- Hooks the kernel
+- Injects input
+- Reads ETW directly
+- Executes OS commands directly
 
-## Evidence System
-- Immutable, hashed, time-stamped, source-tagged, linked to case/control/task.
+If it can crash, hang, or be exploited, it belongs in Rust.
 
-## Compliance & Audit
-- Local control checks, artefact collection, evidence bundles. Never declares compliance.
+### C++ (Capability Providers, “the hands”)
+C++ is responsible only for:
+- ETW subscription and decoding
+- Process, file, registry observation
+- Screen capture and input injection
+- Remote session primitives
+- Patch API invocation
+- Script execution sandboxing
+- File-system operations
+- Task Manager primitives
 
-## Update Pipeline
-- Signed, staged, rollback-capable, silent, safe.
+C++ never:
+- Decides whether something should run
+- Parses JSON or policies
+- Talks to the backend
+- Stores long-term state
+- Makes compliance claims
 
-## Patch Command Channel (Phase 2)
-The agent polls the command channel for signed patch jobs, acknowledges receipt, executes them in the
-execution service, and reports results to both RMM and PSA.
+C++ modules are dumb, fast, and replaceable.
 
-### Patch Job Command Schema (Canonical Payload)
-```json
-{
-  "job_id": "patch-job-001",
-  "asset_id": "asset-123",
-  "scheduled_at": "2024-05-01T01:00:00Z",
-  "reboot_policy": "if_required",
-  "issued_at": 1714500000,
-  "nonce": "c3f42aa1d0d34f08babb7816f3f0c1f0",
-  "patches": [
-    {
-      "patch_id": "patch-001",
-      "title": "Windows Security Update",
-      "vendor": "Microsoft",
-      "severity": "critical",
-      "kb": "KB5010001"
-    }
-  ]
-}
+## Process Model (Windows-first)
+You want multiple services, not threads.
+
+Required services:
+- **agent-core.exe** (Rust, LocalSystem)
+- **agent-sensor.exe** (C++, LocalSystem)
+- **agent-exec.exe** (C++, LocalSystem)
+- **agent-user-helper.exe** (C++/Rust, User context)
+- **agent-watchdog.exe** (Rust, minimal)
+
+Each binary:
+- Has its own ACLs
+- Has a narrow IPC surface
+- Can be restarted independently
+
+## IPC Design (Critical)
+
+### Transport
+- Named pipes with strict ACLs
+- Only agent-core can connect
+- No shared memory without versioned schemas
+- No ad-hoc strings
+
+### Message format
+- Protobuf (or FlatBuffers) is mandatory, not JSON
+- C++ uses generated headers; Rust uses generated types
+
+Rust validates everything:
+- Message version
+- Field presence
+- Size limits
+- Rate limits
+
+If validation fails, the message is dropped and logged.
+
+See `ipc/proto/agent_ipc.proto` for canonical schemas.
+
+## Sensor Subsystem (C++ → Rust → SIEM/EDR)
+
+### C++ Sensor responsibilities
+- Subscribe to ETW providers
+- Decode Windows Event Logs
+- Capture process start/stop, command lines, file writes, registry changes, network connections
+- Emit facts, not conclusions
+
+Example C++ output struct:
+```cpp
+struct ProcessStart {
+    uint32_t pid;
+    uint32_t ppid;
+    wchar_t image_path[260];
+    wchar_t command_line[4096];
+    FILETIME timestamp;
+};
 ```
 
-### Signed Command Envelope
-The backend wraps the canonical payload with a signature:
-```json
-{
-  "job_id": "patch-job-001",
-  "asset_id": "asset-123",
-  "scheduled_at": "2024-05-01T01:00:00Z",
-  "reboot_policy": "if_required",
-  "issued_at": 1714500000,
-  "nonce": "c3f42aa1d0d34f08babb7816f3f0c1f0",
-  "patches": [
-    {
-      "patch_id": "patch-001",
-      "title": "Windows Security Update",
-      "vendor": "Microsoft",
-      "severity": "critical",
-      "kb": "KB5010001"
-    }
-  ],
-  "signature": "base64(hmac_sha256(shared_key, issued_at + '.' + canonical_payload))"
-}
-```
+### Rust Core responsibilities
+- Normalise sensor data
+- Attach asset identity
+- Forward to SIEM (raw + normalised)
+- Forward to EDR engine (local rules)
+- Persist minimal rolling buffers
+- Hash and timestamp everything
 
-### Command Channel Endpoints (mTLS or API key + nonce)
-- `GET /mtls/rmm/patch-jobs/next?asset_id={asset_id}` returns a signed patch job or 204 if none.
-- `POST /mtls/rmm/patch-jobs/ack` acknowledges receipt/execution state.
-- `POST /mtls/rmm/patch-jobs/result` posts execution results and summaries.
+## EDR Engine (Rust-first)
+The EDR engine lives in Rust, not C++.
 
-### Security Controls
-- HMAC signatures validated with shared key (`AGENT_HMAC_SHARED_KEY`).
-- Nonce and timestamp required; replay protection enforces ±5 minute skew.
-- mTLS supported via agent cert/key or API key via `AGENT_API_KEY`.
+Why:
+- Behavioural logic
+- Rule evaluation
+- State tracking
+- Confidence scoring
+- Evidence selection
 
-## Build System
-- CMake, multi-binary output, strict boundaries.
+Flow:
+1. Sensor event arrives
+2. Rust EDR engine evaluates rules
+3. Detection object created
+4. If allowed, Rust issues a signed command to C++ execution service
+5. Evidence captured
+6. Detection sent to SIEM and PSA
 
-## Threat Model
-- Privilege separation, crash containment, anti-tamper, binary integrity, controlled update pipeline.
+C++ never decides containment.
 
-## Next Steps
-- IPC schema implementation
-- Windows kernel interaction boundaries
-- Secure update pipeline design
-- C++ project layout and build system
-- Threat modelling the agent itself
+## RMM Execution (C++ Actuator, Rust Control)
+
+Execution authority chain:
+**PSA → Rust Core → Signed Command → C++ Exec → Result → Rust → PSA**
+
+If the Rust core does not sign it, it does not happen.
+
+### C++ Exec capabilities
+- Run scripts (PowerShell, CMD)
+- Apply patches
+- Install/uninstall software
+- Control services
+- Manage processes
+- File explorer primitives
+- Remote control primitives
+
+### Rust safety controls
+- Scope validation
+- Asset binding
+- Time windows
+- Rate limits
+- Rollback awareness
+- Evidence capture
+
+Every execution produces:
+- Stdout
+- Stderr
+- Exit code
+- File deltas (if applicable)
+- Timestamps
+- Hashes
+
+## Compliance Self-Audit (Rust)
+This is pure Rust logic.
+
+Why:
+- Deterministic checks
+- Strong typing of controls
+- Evidence bundling
+- No OS hooks required
+
+Example checks:
+- Firewall enabled
+- Disk encryption active
+- Secure boot enabled
+- AV/EDR running
+- Patch level within policy
+- Logging enabled
+
+Each check returns:
+- Boolean result
+- Evidence artefact (file, command output)
+- Timestamp
+- Control reference
+
+Rust sends assertions + evidence, never “compliant”.
+
+## Update Pipeline (Rust-controlled)
+Update flow:
+1. Backend publishes signed manifest
+2. Rust core verifies signature
+3. Rust stages update
+4. Rust instructs watchdog
+5. Components restart one by one
+6. Health verified
+7. Rollback if failure
+
+C++ binaries never self-update.
+
+## Build System (Practical)
+
+### Rust
+- Cargo
+- `tokio` for async
+- `rustls` for TLS
+- `serde` for config
+- `prost` (or FlatBuffers) for IPC
+
+### C++
+- MSVC toolchain
+- CMake
+- `/guard:cf`, `/GS`, `/sdl`
+- ASLR enabled
+- Stack protection enforced
+
+### CI
+- Build Rust first
+- Generate IPC schemas
+- Build C++ against them
+- Sign everything
+- Produce versioned artefacts
+
+## Why this holds under pressure
+This design survives because:
+- Unsafe code is isolated
+- Authority is centralised
+- Evidence is first-class
+- Policy is never local
+- Updates are controlled
+- Audits are explainable
+- Bugs have limited blast radius
+
+Most commercial agents fail because they blur these lines.
+
+You are not doing that.
+
+## Reality check
+This is not the easiest way to build an agent.
+It is the way that:
+- Does not rot
+- Does not panic under audits
+- Does not become unmaintainable
+- Does not require hero developers forever
+
+You are designing this as if you expect it to be attacked, misunderstood, and audited.
+That is exactly the right assumption.

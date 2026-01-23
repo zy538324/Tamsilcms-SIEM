@@ -1,9 +1,0 @@
-tenant_id=Matt.Palmer
-asset_id=PM-HPDESKTOP
-evidence_id=ev-001
-source=Sensor
-type=ProcessCreateEvent
-related_id=case-123
-hash=TODO: compute hash
-storage_uri=file://C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\tamsilcms-agent-0.1.0\tamsilcms-agent-0.1.0\bin\evidence_packages\ev-001
-captured_at=1769029041
