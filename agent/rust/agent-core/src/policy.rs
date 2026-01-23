@@ -71,19 +71,6 @@ impl PolicyBundle {
             telemetry_streams: vec!["sensor".to_string(), "agent".to_string()],
         }
 
-        let mut unique_streams = HashSet::new();
-        for stream in &self.telemetry_streams {
-            if !validate_bounded_string(stream, limits.max_stream_len) {
-                return false;
-            }
-            if !unique_streams.insert(stream) {
-                return false;
-            }
-        }
-        if !is_sorted(&self.telemetry_streams) {
-            return false;
-        }
-
         if let Some(signing_key) = &options.signing_key {
             if !self.verify_signature(signing_key) {
                 return false;
@@ -122,22 +109,16 @@ impl PolicyBundle {
         payload
     }
 
-    pub fn from_env() -> Self {
-        if let Ok(path) = env::var("AGENT_POLICY_PATH") {
-            if let Ok(raw) = fs::read_to_string(path) {
-                if let Ok(policy) = serde_json::from_str::<PolicyBundle>(&raw) {
-                    return policy;
-                }
-            }
-        }
-
-        if let Ok(raw) = env::var("AGENT_POLICY_JSON") {
-            if let Ok(policy) = serde_json::from_str::<PolicyBundle>(&raw) {
-                return policy;
-            }
-        }
-
-        Self::placeholder()
+    fn verify_signature(&self, signing_key: &str) -> bool {
+        let payload = self.signing_payload();
+        let mut mac = match Hmac::<Sha256>::new_from_slice(signing_key.as_bytes()) {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+        mac.update(payload.as_bytes());
+        let signature_bytes = mac.finalize().into_bytes();
+        let expected = BASE64_STANDARD.encode(signature_bytes);
+        constant_time_eq(self.signature.as_bytes(), expected.as_bytes())
     }
 
     pub fn from_env() -> Self {
