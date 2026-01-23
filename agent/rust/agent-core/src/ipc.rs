@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::ipc_validation::{validate_payload_size, validate_proto_envelope, validate_schema_version, EnvelopeMeta};
 use crate::ipc_router::route_proto_envelope;
+use crate::policy::PolicyBundle;
 use crate::rate_limit::RateLimiter;
 
 pub const IPC_SCHEMA_VERSION: u32 = 1;
@@ -11,14 +12,21 @@ pub struct IpcServer {
     pub pipe_name: String,
     pub max_payload_bytes: usize,
     pub rate_limiter: Arc<Mutex<RateLimiter>>,
+    pub policy: Arc<PolicyBundle>,
 }
 
 impl IpcServer {
-    pub fn new(pipe_name: String, max_payload_bytes: usize, rate_limiter: RateLimiter) -> Self {
+    pub fn new(
+        pipe_name: String,
+        max_payload_bytes: usize,
+        rate_limiter: RateLimiter,
+        policy: PolicyBundle,
+    ) -> Self {
         Self {
             pipe_name,
             max_payload_bytes,
             rate_limiter: Arc::new(Mutex::new(rate_limiter)),
+            policy: Arc::new(policy),
         }
     }
 
@@ -48,6 +56,7 @@ impl IpcServer {
         if !self.validate_proto(envelope) {
             return false;
         }
-        route_proto_envelope(envelope)
+        let now_unix_time_ms = crate::time::unix_time_ms();
+        route_proto_envelope(envelope, &self.policy, now_unix_time_ms)
     }
 }
