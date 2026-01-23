@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import csv
 import io
-import asyncpg
 from uuid import UUID
 from fastapi import (
     Depends,
@@ -48,7 +47,8 @@ from .models import (
     EventRecord,
     EventTimeline,
 )
-from .storage import InventoryStore, TelemetryReplayError
+from .database import IngestionDatabase, create_database
+from .storage import TelemetryReplayError
 from .state import derive_state
 from .telemetry import TelemetryValidationError, metric_unit, normalise_samples
 from .events import EventValidationError, validate_batch
@@ -61,14 +61,14 @@ def get_settings() -> Settings:
     return load_settings()
 
 
-def get_store() -> InventoryStore:
-    store = getattr(app.state, "store", None)
-    if not store:
+def get_database() -> IngestionDatabase:
+    database = getattr(app.state, "database", None)
+    if not database:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="storage_unavailable",
         )
-    return store
+    return database
 
 
 def validate_sample_timestamps(
@@ -119,20 +119,15 @@ async def enforce_https(request: Request) -> None:
 @app.on_event("startup")
 async def startup() -> None:
     settings = load_settings()
-    pool = await asyncpg.create_pool(
-        dsn=settings.database_dsn,
-        min_size=settings.database_min_connections,
-        max_size=settings.database_max_connections,
-    )
-    app.state.pool = pool
-    app.state.store = InventoryStore(pool=pool)
+    database = await create_database(settings)
+    app.state.database = database
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
-    pool = getattr(app.state, "pool", None)
-    if pool:
-        await pool.close()
+    database = getattr(app.state, "database", None)
+    if database:
+        await database.close()
 
 
 @app.get("/health", response_class=JSONResponse)
@@ -147,22 +142,22 @@ async def health_check(settings: Settings = Depends(get_settings)) -> dict:
 @app.post("/inventory/hardware", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_hardware(
     payload: HardwareInventory,
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> dict:
-    await store.upsert_hardware(payload)
+    await database.upsert_hardware(payload)
     return {"status": "accepted"}
 
 
 @app.post("/telemetry", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_telemetry(
     payload: TelemetryPayload,
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     settings: Settings = Depends(get_settings),
     _: None = Depends(enforce_https),
 ) -> TelemetryIngestResponse:
     if len(payload.samples) > settings.telemetry_sample_limit:
-        await store.record_telemetry_rejection(
+        await database.record_telemetry_rejection(
             payload_id=payload.payload_id,
             tenant_id=payload.tenant_id,
             asset_id=payload.asset_id,
@@ -174,7 +169,7 @@ async def ingest_telemetry(
         )
     now = datetime.now(timezone.utc)
     if payload.collected_at < now - timedelta(seconds=settings.telemetry_stale_seconds):
-        await store.record_telemetry_rejection(
+        await database.record_telemetry_rejection(
             payload_id=payload.payload_id,
             tenant_id=payload.tenant_id,
             asset_id=payload.asset_id,
@@ -185,7 +180,7 @@ async def ingest_telemetry(
             detail="payload_stale",
         )
     if payload.collected_at > now + timedelta(seconds=settings.telemetry_future_seconds):
-        await store.record_telemetry_rejection(
+        await database.record_telemetry_rejection(
             payload_id=payload.payload_id,
             tenant_id=payload.tenant_id,
             asset_id=payload.asset_id,
@@ -207,7 +202,7 @@ async def ingest_telemetry(
         validate_sample_uniqueness(payload)
         samples = normalise_samples(payload.samples)
     except TelemetryValidationError as exc:
-        await store.record_telemetry_rejection(
+        await database.record_telemetry_rejection(
             payload_id=payload.payload_id,
             tenant_id=payload.tenant_id,
             asset_id=payload.asset_id,
@@ -218,14 +213,14 @@ async def ingest_telemetry(
             detail=exc.reason,
         ) from exc
     try:
-        await store.ingest_telemetry(
+        await database.ingest_telemetry(
             payload=payload,
             samples=samples,
             baseline_window=settings.telemetry_baseline_window,
             anomaly_threshold=settings.telemetry_anomaly_stddev_threshold,
         )
     except TelemetryReplayError as exc:
-        await store.record_telemetry_rejection(
+        await database.record_telemetry_rejection(
             payload_id=payload.payload_id,
             tenant_id=payload.tenant_id,
             asset_id=payload.asset_id,
@@ -236,7 +231,7 @@ async def ingest_telemetry(
             detail="payload_replay",
         ) from exc
     except Exception as exc:  # pragma: no cover - defensive fallback
-        await store.record_telemetry_rejection(
+        await database.record_telemetry_rejection(
             payload_id=payload.payload_id,
             tenant_id=payload.tenant_id,
             asset_id=payload.asset_id,
@@ -258,10 +253,10 @@ async def ingest_telemetry(
 )
 async def list_telemetry_metrics(
     asset_id: str = Path(..., min_length=8, max_length=64),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[TelemetryMetricSummary]:
-    return await store.list_telemetry_metrics(asset_id)
+    return await database.list_telemetry_metrics(asset_id)
 
 
 @app.get(
@@ -274,7 +269,7 @@ async def get_telemetry_series(
     since: datetime | None = Query(default=None),
     until: datetime | None = Query(default=None),
     limit: int = Query(default=500, ge=1, le=5000),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> TelemetrySeries:
     try:
@@ -284,7 +279,7 @@ async def get_telemetry_series(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=exc.reason,
         ) from exc
-    return await store.get_telemetry_series(
+    return await database.get_telemetry_series(
         asset_id=asset_id,
         metric_name=metric_name,
         since=since,
@@ -299,10 +294,10 @@ async def get_telemetry_series(
 )
 async def list_telemetry_baselines(
     asset_id: str = Path(..., min_length=8, max_length=64),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[TelemetryBaseline]:
-    return await store.list_telemetry_baselines(asset_id)
+    return await database.list_telemetry_baselines(asset_id)
 
 
 @app.get(
@@ -314,10 +309,10 @@ async def list_telemetry_anomalies(
     status: str | None = Query(default=None, min_length=3, max_length=16),
     since: datetime | None = Query(default=None),
     limit: int = Query(default=200, ge=1, le=1000),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[TelemetryAnomaly]:
-    return await store.list_telemetry_anomalies(
+    return await database.list_telemetry_anomalies(
         asset_id=asset_id,
         status=status,
         since=since,
@@ -328,7 +323,7 @@ async def list_telemetry_anomalies(
 @app.post("/events", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_events(
     request: Request,
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     settings: Settings = Depends(get_settings),
     _: None = Depends(enforce_https),
     signature: str | None = Header(None, alias="X-Request-Signature"),
@@ -343,8 +338,8 @@ async def ingest_events(
             detail="invalid_payload",
         ) from exc
 
-    if await store.event_payload_exists(batch.payload_id):
-        await store.record_event_batch_log(
+    if await database.event_payload_exists(batch.payload_id):
+        await database.record_event_batch_log(
             payload_id=batch.payload_id,
             tenant_id=batch.tenant_id,
             asset_id=batch.asset_id,
@@ -363,7 +358,7 @@ async def ingest_events(
         )
 
     if not signature or not timestamp:
-        await store.record_event_batch_log(
+        await database.record_event_batch_log(
             payload_id=batch.payload_id,
             tenant_id=batch.tenant_id,
             asset_id=batch.asset_id,
@@ -384,7 +379,7 @@ async def ingest_events(
     try:
         timestamp_int = int(timestamp)
     except ValueError as exc:
-        await store.record_event_batch_log(
+        await database.record_event_batch_log(
             payload_id=batch.payload_id,
             tenant_id=batch.tenant_id,
             asset_id=batch.asset_id,
@@ -404,7 +399,7 @@ async def ingest_events(
 
     valid, reason = verify_signature(settings, raw_body, signature, timestamp_int)
     if not valid:
-        await store.record_event_batch_log(
+        await database.record_event_batch_log(
             payload_id=batch.payload_id,
             tenant_id=batch.tenant_id,
             asset_id=batch.asset_id,
@@ -425,7 +420,7 @@ async def ingest_events(
     try:
         validate_batch(batch, settings.event_batch_limit)
     except EventValidationError as exc:
-        await store.record_event_batch_log(
+        await database.record_event_batch_log(
             payload_id=batch.payload_id,
             tenant_id=batch.tenant_id,
             asset_id=batch.asset_id,
@@ -443,7 +438,7 @@ async def ingest_events(
             detail=exc.reason,
         ) from exc
 
-    gaps, drifts, accepted, rejected = await store.ingest_event_batch(
+    gaps, drifts, accepted, rejected = await database.ingest_event_batch(
         batch=batch,
         signature=signature,
         signature_verified=True,
@@ -468,10 +463,10 @@ async def list_recent_events(
     since: datetime | None = Query(default=None),
     event_category: str | None = Query(default=None, min_length=3, max_length=32),
     event_type: str | None = Query(default=None, min_length=3, max_length=80),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[EventRecord]:
-    return await store.list_recent_events(
+    return await database.list_recent_events(
         tenant_id=tenant_id,
         limit=limit,
         since=since,
@@ -483,10 +478,10 @@ async def list_recent_events(
 @app.get("/events/{event_id}", response_model=EventRecord)
 async def get_event(
     event_id: str,
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> EventRecord:
-    event = await store.get_event(UUID(event_id))
+    event = await database.get_event(UUID(event_id))
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -503,10 +498,10 @@ async def get_asset_timeline(
     limit: int = Query(default=500, ge=1, le=5000),
     event_category: str | None = Query(default=None, min_length=3, max_length=32),
     event_type: str | None = Query(default=None, min_length=3, max_length=80),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> EventTimeline:
-    return await store.get_asset_timeline(
+    return await database.get_asset_timeline(
         asset_id=asset_id,
         limit=limit,
         since=since,
@@ -520,20 +515,20 @@ async def get_asset_timeline(
 async def list_event_gaps(
     asset_id: str = Path(..., min_length=8, max_length=64),
     limit: int = Query(default=100, ge=1, le=1000),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[EventGapReport]:
-    return await store.list_event_gaps(asset_id=asset_id, limit=limit)
+    return await database.list_event_gaps(asset_id=asset_id, limit=limit)
 
 
 @app.get("/events/assets/{asset_id}/clock-drifts", response_model=list[EventClockDrift])
 async def list_event_drifts(
     asset_id: str = Path(..., min_length=8, max_length=64),
     limit: int = Query(default=100, ge=1, le=1000),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[EventClockDrift]:
-    return await store.list_event_drifts(asset_id=asset_id, limit=limit)
+    return await database.list_event_drifts(asset_id=asset_id, limit=limit)
 
 
 @app.get("/events/ingest-log", response_model=list[EventIngestLogRecord])
@@ -543,10 +538,10 @@ async def list_event_ingest_logs(
     status: str | None = Query(default=None, min_length=3, max_length=16),
     limit: int = Query(default=200, ge=1, le=1000),
     since: datetime | None = Query(default=None),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[EventIngestLogRecord]:
-    return await store.list_event_ingest_logs(
+    return await database.list_event_ingest_logs(
         tenant_id=tenant_id,
         asset_id=asset_id,
         status=status,
@@ -559,10 +554,10 @@ async def list_event_ingest_logs(
 async def export_asset_events(
     asset_id: str = Path(..., min_length=8, max_length=64),
     limit: int = Query(default=2000, ge=1, le=10000),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> Response:
-    timeline = await store.get_asset_timeline(
+    timeline = await database.get_asset_timeline(
         asset_id=asset_id,
         limit=limit,
         since=None,
@@ -613,60 +608,60 @@ async def export_asset_events(
 @app.post("/inventory/os", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_os(
     payload: OsInventory,
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> dict:
-    await store.upsert_os(payload)
+    await database.upsert_os(payload)
     return {"status": "accepted"}
 
 
 @app.post("/inventory/software", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_software(
     payload: SoftwareInventory,
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> dict:
-    await store.upsert_software(payload)
+    await database.upsert_software(payload)
     return {"status": "accepted"}
 
 
 @app.post("/inventory/users", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_users(
     payload: LocalUsersInventory,
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> dict:
-    await store.upsert_users(payload)
+    await database.upsert_users(payload)
     return {"status": "accepted"}
 
 
 @app.post("/inventory/groups", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_groups(
     payload: LocalGroupsInventory,
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> dict:
-    await store.upsert_groups(payload)
+    await database.upsert_groups(payload)
     return {"status": "accepted"}
 
 
 @app.get("/inventory/{asset_id}", response_model=InventorySnapshot)
 async def get_inventory(
     asset_id: str = Path(..., min_length=8, max_length=64),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> InventorySnapshot:
-    snapshot = await store.snapshot(asset_id)
+    snapshot = await database.snapshot(asset_id)
     return snapshot
 
 
 @app.get("/inventory/{asset_id}/state", response_model=AssetStateResponse)
 async def get_inventory_state(
     asset_id: str = Path(..., min_length=8, max_length=64),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> AssetStateResponse:
-    snapshot = await store.snapshot(asset_id)
+    snapshot = await database.snapshot(asset_id)
     state = derive_state(asset_id, snapshot)
     return AssetStateResponse(**state.__dict__)
 
@@ -677,10 +672,10 @@ async def list_assets(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
     since: datetime | None = Query(default=None),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[AssetRecord]:
-    return await store.list_assets(
+    return await database.list_assets(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
@@ -694,10 +689,10 @@ async def list_assets_page(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
     since: datetime | None = Query(default=None),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> AssetRecordPage:
-    items, total = await store.list_assets_page(
+    items, total = await database.list_assets_page(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
@@ -717,10 +712,10 @@ async def list_asset_states(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
     since: datetime | None = Query(default=None),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[AssetStateResponse]:
-    return await store.list_asset_states(
+    return await database.list_asset_states(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
@@ -734,10 +729,10 @@ async def list_asset_states_page(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
     since: datetime | None = Query(default=None),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> AssetStatePage:
-    items, total = await store.list_asset_states_page(
+    items, total = await database.list_asset_states_page(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
@@ -757,10 +752,10 @@ async def list_asset_overviews(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
     since: datetime | None = Query(default=None),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> list[AssetInventoryOverview]:
-    return await store.list_asset_overviews(
+    return await database.list_asset_overviews(
         tenant_id=tenant_id, limit=limit, offset=offset, since=since
     )
 
@@ -771,10 +766,10 @@ async def list_asset_overview_page(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100000),
     since: datetime | None = Query(default=None),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> AssetInventoryPage:
-    items, total = await store.list_asset_overview_page(
+    items, total = await database.list_asset_overview_page(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
@@ -794,10 +789,10 @@ async def export_asset_overviews_csv(
     limit: int = Query(default=500, ge=1, le=2000),
     offset: int = Query(default=0, ge=0, le=100000),
     since: datetime | None = Query(default=None),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> Response:
-    records = await store.list_asset_overviews(
+    records = await database.list_asset_overviews(
         tenant_id=tenant_id,
         limit=limit,
         offset=offset,
@@ -846,10 +841,10 @@ async def export_asset_overviews_csv(
 )
 async def get_asset_overview(
     asset_id: str = Path(..., min_length=8, max_length=64),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> AssetInventoryOverview:
-    overview = await store.get_asset_overview(asset_id)
+    overview = await database.get_asset_overview(asset_id)
     if not overview:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -861,7 +856,7 @@ async def get_asset_overview(
 @app.get("/inventory/assets/stats", response_model=AssetInventoryStats)
 async def get_asset_inventory_stats(
     tenant_id: str | None = Query(default=None, min_length=8, max_length=64),
-    store: InventoryStore = Depends(get_store),
+    database: IngestionDatabase = Depends(get_database),
     _: None = Depends(enforce_https),
 ) -> AssetInventoryStats:
-    return await store.get_asset_inventory_stats(tenant_id=tenant_id)
+    return await database.get_asset_inventory_stats(tenant_id=tenant_id)
