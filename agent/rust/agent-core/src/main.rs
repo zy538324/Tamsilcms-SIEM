@@ -96,6 +96,8 @@ async fn main() {
     let _telemetry_routed = route_telemetry(TelemetryPayload {
         stream: "sensor".to_string(),
         payload_bytes: 1,
+        event_count: 1,
+        checksum_sha256: Some("checksum-placeholder".to_string()),
     }, &policy);
     let _command_routed = route_command(SignedCommand {
         command_id: "cmd-placeholder".to_string(),
