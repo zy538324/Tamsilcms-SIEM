@@ -7,7 +7,10 @@
 #include <curl/curl.h>
 
 #include <chrono>
+#include <cctype>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -17,6 +20,22 @@ namespace agent_patch {
 
 namespace {
 constexpr int kSignatureSkewSeconds = 300;
+
+std::string SanitiseFilenameToken(const std::string& input) {
+    std::string output;
+    output.reserve(input.size());
+    for (const char c : input) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_') {
+            output.push_back(c);
+        } else {
+            output.push_back('_');
+        }
+    }
+    if (output.empty()) {
+        return "unnamed";
+    }
+    return output;
+}
 
 std::string BuildIsoTimestamp(const std::chrono::system_clock::time_point& time_point) {
     auto now_time = std::chrono::system_clock::to_time_t(time_point);
@@ -84,6 +103,71 @@ std::string GenerateNonce() {
         stream << std::hex << dist(rng);
     }
     return stream.str();
+}
+
+bool EnqueueUplinkMtlsRmmPayload(const std::string& queue_dir, const std::string& category, const std::string& payload) {
+    if (queue_dir.empty() || payload.empty()) {
+        std::cerr << "[PatchJobs] Missing queue directory or payload for uplink." << std::endl;
+        return false;
+    }
+
+    std::filesystem::path queue_path(queue_dir);
+    std::filesystem::create_directories(queue_path);
+
+    const auto now_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string safe_category = SanitiseFilenameToken(category);
+    std::filesystem::path payload_path = queue_path / ("mtls_rmm_" + safe_category + "_" + std::to_string(now_epoch) + ".json");
+
+    std::ofstream out(payload_path);
+    if (!out) {
+        std::cerr << "[PatchJobs] Unable to write uplink queue item: " << payload_path << std::endl;
+        return false;
+    }
+
+    std::string json;
+    json.reserve(payload.size() + 64);
+    json += "{";
+    json += "\"kind\":\"mtls_rmm\",";
+    json += "\"path\":\"/patch-jobs/ack\",";
+    json += "\"payload_json\":\"" + JsonEscape(payload) + "\"";
+    json += "}";
+
+    out << json;
+    out.close();
+    return true;
+}
+
+bool EnqueueUplinkPatchPayload(const std::string& queue_dir, const std::string& job_id, const std::string& payload) {
+    if (queue_dir.empty() || payload.empty()) {
+        std::cerr << "[PatchJobs] Missing queue directory or payload for uplink." << std::endl;
+        return false;
+    }
+
+    std::filesystem::path queue_path(queue_dir);
+    std::filesystem::create_directories(queue_path);
+
+    const auto now_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string safe_job = SanitiseFilenameToken(job_id);
+    std::filesystem::path payload_path = queue_path / ("patch_result_" + safe_job + "_" + std::to_string(now_epoch) + ".json");
+
+    std::ofstream out(payload_path);
+    if (!out) {
+        std::cerr << "[PatchJobs] Unable to write uplink queue item: " << payload_path << std::endl;
+        return false;
+    }
+
+    std::string json;
+    json.reserve(payload.size() + 64);
+    json += "{";
+    json += "\"kind\":\"patch\",";
+    json += "\"payload_json\":\"" + JsonEscape(payload) + "\"";
+    json += "}";
+
+    out << json;
+    out.close();
+    return true;
 }
 
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -158,33 +242,6 @@ bool GetJson(const agent::Config& config, const std::string& url, std::string* r
         *response = response_body;
     }
 
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-    return result == CURLE_OK;
-}
-
-bool PostJson(const agent::Config& config, const std::string& url, const std::string& payload) {
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        return false;
-    }
-
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "TamsilAgent/1.0");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
-
-    std::vector<std::string> header_strings;
-    if (!BuildSignedHeaders(config, payload, &header_strings)) {
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    struct curl_slist* headers = nullptr;
-    for (const auto& header : header_strings) {
-        headers = curl_slist_append(headers, header.c_str());
-    }
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    CURLcode result = curl_easy_perform(curl);
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
     return result == CURLE_OK;
@@ -393,11 +450,13 @@ bool PatchJobClient::AcknowledgePatchJob(const PatchJobAck& ack) const {
     payload << "\"acknowledged_at\":\"" << JsonEscape(BuildIsoTimestamp(ack.acknowledged_at)) << "\"";
     payload << '}';
 
-    bool ok = PostJson(config_, BuildEndpoint(config_, "/patch-jobs/ack"), payload.str());
-    if (!ok) {
-        std::cerr << "[PatchJobs] Failed to acknowledge job " << ack.job_id << std::endl;
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool queued = EnqueueUplinkMtlsRmmPayload(queue_path, "patch_job_ack", payload.str());
+    if (!queued) {
+        std::cerr << "[PatchJobs] Failed to queue acknowledgement for job " << ack.job_id << std::endl;
     }
-    return ok;
+    return queued;
 }
 
 bool PatchJobClient::ReportPatchResult(const agent_execution::PatchJobResult& result) const {
@@ -416,11 +475,13 @@ bool PatchJobClient::ReportPatchResult(const agent_execution::PatchJobResult& re
     payload << "\"completed_at\":\"" << JsonEscape(BuildIsoTimestamp(result.completed_at)) << "\"";
     payload << '}';
 
-    bool ok = PostJson(config_, BuildEndpoint(config_, "/patch-jobs/result"), payload.str());
-    if (!ok) {
-        std::cerr << "[PatchJobs] Failed to report result for job " << result.job_id << std::endl;
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool queued = EnqueueUplinkPatchPayload(queue_path, result.job_id, payload.str());
+    if (!queued) {
+        std::cerr << "[PatchJobs] Failed to queue patch result for job " << result.job_id << std::endl;
     }
-    return ok;
+    return queued;
 }
 
 }  // namespace agent_patch

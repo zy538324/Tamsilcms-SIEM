@@ -70,16 +70,6 @@ impl PolicyBundle {
             },
             telemetry_streams: vec!["sensor".to_string(), "agent".to_string()],
         }
-
-        if let Some(signing_key) = &options.signing_key {
-            if !self.verify_signature(signing_key) {
-                return false;
-            }
-        } else if !options.allow_unsigned {
-            return false;
-        }
-
-        true
     }
 
     pub fn allows_action(&self, action: &str) -> bool {
