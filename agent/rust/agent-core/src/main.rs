@@ -21,6 +21,7 @@ mod security;
 mod service_registry;
 mod siem;
 mod telemetry_router;
+mod time;
 mod update;
 mod vulnerability;
 
@@ -37,6 +38,7 @@ use crate::rmm::queue_execution_request;
 use crate::service_registry::{ServiceDescriptor, ServiceRegistry};
 use crate::siem::prepare_telemetry_batch;
 use crate::telemetry_router::{route_telemetry, TelemetryPayload};
+use crate::time::unix_time_ms;
 use crate::vulnerability::assess_exposure;
 
 #[tokio::main]
@@ -52,14 +54,20 @@ async fn main() {
 
     verify_trust_bundle();
 
-    let policy = PolicyBundle::placeholder();
-    if !policy.validate() {
+    let policy = PolicyBundle::from_env();
+    let policy_now = unix_time_ms();
+    if !policy.validate(policy_now) {
         warn!("policy validation failed; refusing to start services");
         return;
     }
 
     let rate_limiter = RateLimiter::new(600);
-    let ipc_server = IpcServer::new(config.ipc_pipe_name.clone(), config.max_payload_bytes, rate_limiter);
+    let ipc_server = IpcServer::new(
+        config.ipc_pipe_name.clone(),
+        config.max_payload_bytes,
+        rate_limiter,
+        policy.clone(),
+    );
     ipc_server.start();
 
     let mut registry = ServiceRegistry::new();
@@ -76,18 +84,22 @@ async fn main() {
 
     let _compliance_results = run_self_audit();
     let _detections = evaluate_rules();
-    let _execution_request = queue_execution_request();
+    let _execution_request = queue_execution_request(&policy);
     let _telemetry_batch = prepare_telemetry_batch();
     let _vulnerability_findings = assess_exposure();
 
     let _telemetry_routed = route_telemetry(TelemetryPayload {
         stream: "sensor".to_string(),
         payload_bytes: 1,
-    });
+    }, &policy);
     let _command_routed = route_command(SignedCommand {
         command_id: "cmd-placeholder".to_string(),
-        payload: "payload-placeholder".to_string(),
-    });
+        signed_payload: "payload-placeholder".to_string(),
+        action: "script-run".to_string(),
+        arguments: vec!["-version".to_string()],
+        not_before_unix_time_ms: unix_time_ms().saturating_sub(1_000),
+        not_after_unix_time_ms: unix_time_ms().saturating_add(60_000),
+    }, &policy, unix_time_ms());
 
     let mut pipeline_status = PipelineStatus::new();
     pipeline_status.mark_edr_ready();
