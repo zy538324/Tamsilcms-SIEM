@@ -11,4 +11,5 @@ Thumbs.db
 
 # Environment
 .env
-
+agent/build/
+agent/evidence_packages/
