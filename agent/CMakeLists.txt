@@ -13,30 +13,7 @@ message(STATUS "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}")
 # Common libraries for agent targets
 set(AGENT_LIBS OpenSSL::SSL OpenSSL::Crypto CURL::libcurl)
 
-add_executable(agent_hello
-    src/main.cpp
-    src/agent_config.cpp
-    src/agent_crash.cpp
-    src/agent_defence.cpp
-    src/agent_id.cpp
-    src/agent_inventory.cpp
-    src/agent_rmm.cpp
-    src/agent_signing.cpp
-    src/agent_heartbeat.cpp
-    src/agent_integrity.cpp
-    src/agent_retry.cpp
-    src/agent_system.cpp
-    src/agent_uptime.cpp
-    src/agent_watchdog.cpp
-    agent_icon.rc
-)
-
-target_include_directories(agent_hello PRIVATE include)
-
-target_link_libraries(agent_hello PRIVATE ${AGENT_LIBS})
-
-# Make top-level include available to subprojects
-target_include_directories(agent_hello PRIVATE include)
+message(STATUS "Legacy single-binary target removed; use service binaries instead.")
 
 # Add IPC and service component subdirectories so the full agent builds
 add_subdirectory(ipc)
@@ -63,9 +40,6 @@ endif()
 include(InstallRequiredSystemLibraries)
 
 # Install executables if they exist
-if(TARGET agent_hello)
-    install(TARGETS agent_hello RUNTIME DESTINATION bin)
-endif()
 if(TARGET agent_core)
     install(TARGETS agent_core RUNTIME DESTINATION bin)
 endif()
