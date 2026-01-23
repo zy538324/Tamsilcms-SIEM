@@ -70,6 +70,105 @@ impl PolicyBundle {
             },
             telemetry_streams: vec!["sensor".to_string(), "agent".to_string()],
         }
+        if !validate_bounded_string(&self.version, 64) {
+            return false;
+        }
+        if !validate_bounded_string(&self.signing_key_id, 128) {
+            return false;
+        }
+        if !validate_bounded_string(&self.signature, limits.max_payload_len) {
+            return false;
+        }
+        if let Some(expected_key_id) = &options.expected_key_id {
+            if &self.signing_key_id != expected_key_id {
+                return false;
+            }
+        }
+        if self.issued_at_unix_time_ms > self.expires_at_unix_time_ms {
+            return false;
+        }
+        if now_unix_time_ms < self.issued_at_unix_time_ms
+            || now_unix_time_ms > self.expires_at_unix_time_ms
+        {
+            return false;
+        }
+
+        if self.execution.allowed_actions.is_empty()
+            || self.execution.max_arguments == 0
+            || self.execution.max_argument_length == 0
+        {
+            return false;
+        }
+
+        let mut unique_actions = HashSet::new();
+        for action in &self.execution.allowed_actions {
+            if !validate_bounded_string(action, limits.max_command_id_len) {
+                return false;
+            }
+            if !is_valid_action_name(action) {
+                return false;
+            }
+            if !unique_actions.insert(action) {
+                return false;
+            }
+        }
+        if !is_sorted(&self.execution.allowed_actions) {
+            return false;
+        }
+
+        if self.telemetry_streams.is_empty() {
+            return false;
+        }
+
+        let mut unique_streams = HashSet::new();
+        for stream in &self.telemetry_streams {
+            if !validate_bounded_string(stream, limits.max_stream_len) {
+                return false;
+            }
+            if !unique_streams.insert(stream) {
+                return false;
+            }
+        }
+        if !is_sorted(&self.telemetry_streams) {
+            return false;
+        }
+
+        if let Some(signing_key) = &options.signing_key {
+            if !self.verify_signature(signing_key) {
+                return false;
+            }
+        } else if !options.allow_unsigned {
+            return false;
+        }
+
+        true
+    }
+
+    pub fn allows_action(&self, action: &str) -> bool {
+        self.execution.allowed_actions.iter().any(|item| item == action)
+    }
+
+    fn signing_payload(&self) -> String {
+        let mut payload = String::new();
+        payload.push_str("schema_version=");
+        payload.push_str(&self.schema_version.to_string());
+        payload.push_str("|version=");
+        payload.push_str(&self.version);
+        payload.push_str("|issued_at=");
+        payload.push_str(&self.issued_at_unix_time_ms.to_string());
+        payload.push_str("|expires_at=");
+        payload.push_str(&self.expires_at_unix_time_ms.to_string());
+        payload.push_str("|signing_key_id=");
+        payload.push_str(&self.signing_key_id);
+        payload.push_str("|allowed_actions=");
+        payload.push_str(&self.execution.allowed_actions.join(","));
+        payload.push_str("|max_arguments=");
+        payload.push_str(&self.execution.max_arguments.to_string());
+        payload.push_str("|max_argument_length=");
+        payload.push_str(&self.execution.max_argument_length.to_string());
+        payload.push_str("|telemetry_streams=");
+        payload.push_str(&self.telemetry_streams.join(","));
+        payload
     }
 
     pub fn from_env() -> Self {
