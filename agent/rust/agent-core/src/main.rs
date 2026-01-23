@@ -52,7 +52,11 @@ async fn main() {
 
     info!(asset_id = %identity.asset_id, agent_id = %identity.agent_id, "agent core starting");
 
-    verify_trust_bundle();
+    let trust_report = verify_trust_bundle();
+    if !trust_report.verified {
+        warn!("trust bundle verification failed; refusing to start services");
+        return;
+    }
 
     let policy = PolicyBundle::from_env();
     let policy_now = unix_time_ms();
