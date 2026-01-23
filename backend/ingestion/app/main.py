@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import csv
 import io
-import asyncpg
 from uuid import UUID
 from fastapi import (
     Depends,
@@ -48,6 +47,7 @@ from .models import (
     EventRecord,
     EventTimeline,
 )
+from .database import create_pool
 from .storage import InventoryStore, TelemetryReplayError
 from .state import derive_state
 from .telemetry import TelemetryValidationError, metric_unit, normalise_samples
@@ -119,11 +119,7 @@ async def enforce_https(request: Request) -> None:
 @app.on_event("startup")
 async def startup() -> None:
     settings = load_settings()
-    pool = await asyncpg.create_pool(
-        dsn=settings.database_dsn,
-        min_size=settings.database_min_connections,
-        max_size=settings.database_max_connections,
-    )
+    pool = await create_pool(settings)
     app.state.pool = pool
     app.state.store = InventoryStore(pool=pool)
 

@@ -10,6 +10,5 @@ Thumbs.db
 *.log
 
 # Environment
-.env
 agent/build/
 agent/evidence_packages/
