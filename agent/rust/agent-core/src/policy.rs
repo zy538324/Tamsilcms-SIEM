@@ -138,6 +138,9 @@ impl PolicyBundle {
                 return false;
             }
         }
+        if !is_sorted(&self.execution.allowed_actions) {
+            return false;
+        }
 
         if self.telemetry_streams.is_empty() {
             return false;
@@ -151,6 +154,9 @@ impl PolicyBundle {
             if !unique_streams.insert(stream) {
                 return false;
             }
+        }
+        if !is_sorted(&self.telemetry_streams) {
+            return false;
         }
 
         if let Some(signing_key) = &options.signing_key {
@@ -219,4 +225,64 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
         diff |= lhs ^ rhs;
     }
     diff == 0
+}
+
+fn is_sorted(values: &[String]) -> bool {
+    values.windows(2).all(|pair| pair[0] <= pair[1])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PolicyBundle, PolicyValidationOptions};
+
+    fn build_valid_policy() -> PolicyBundle {
+        PolicyBundle {
+            schema_version: 1,
+            version: "policy-1".to_string(),
+            issued_at_unix_time_ms: 0,
+            expires_at_unix_time_ms: u64::MAX,
+            signing_key_id: "key-1".to_string(),
+            signature: "placeholder".to_string(),
+            execution: super::ExecutionPolicy {
+                allowed_actions: vec!["patch-apply".to_string(), "script-run".to_string()],
+                max_arguments: 4,
+                max_argument_length: 64,
+            },
+            telemetry_streams: vec!["agent".to_string(), "sensor".to_string()],
+        }
+    }
+
+    #[test]
+    fn validates_when_unsigned_allowed() {
+        let policy = build_valid_policy();
+        let options = PolicyValidationOptions {
+            signing_key: None,
+            expected_key_id: None,
+            allow_unsigned: true,
+        };
+        assert!(policy.validate(1, &options));
+    }
+
+    #[test]
+    fn rejects_when_unsigned_disallowed() {
+        let policy = build_valid_policy();
+        let options = PolicyValidationOptions {
+            signing_key: None,
+            expected_key_id: None,
+            allow_unsigned: false,
+        };
+        assert!(!policy.validate(1, &options));
+    }
+
+    #[test]
+    fn rejects_unsorted_lists() {
+        let mut policy = build_valid_policy();
+        policy.execution.allowed_actions = vec!["script-run".to_string(), "patch-apply".to_string()];
+        let options = PolicyValidationOptions {
+            signing_key: None,
+            expected_key_id: None,
+            allow_unsigned: true,
+        };
+        assert!(!policy.validate(1, &options));
+    }
 }
