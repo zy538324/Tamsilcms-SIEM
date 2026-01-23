@@ -2,7 +2,11 @@ use std::collections::HashSet;
 use std::env;
 use std::fs;
 
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine as _;
+use hmac::{Hmac, Mac};
 use serde::Deserialize;
+use sha2::Sha256;
 
 use crate::security::{validate_bounded_string, ValidationLimits};
 
@@ -25,6 +29,29 @@ pub struct PolicyBundle {
     pub signature: String,
     pub execution: ExecutionPolicy,
     pub telemetry_streams: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PolicyValidationOptions {
+    pub signing_key: Option<String>,
+    pub expected_key_id: Option<String>,
+    pub allow_unsigned: bool,
+}
+
+impl PolicyValidationOptions {
+    pub fn from_env() -> Self {
+        let signing_key = env::var("AGENT_POLICY_SIGNING_KEY").ok();
+        let expected_key_id = env::var("AGENT_POLICY_SIGNING_KEY_ID").ok();
+        let allow_unsigned = env::var("AGENT_POLICY_ALLOW_UNSIGNED")
+            .map(|value| value.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        Self {
+            signing_key,
+            expected_key_id,
+            allow_unsigned,
+        }
+    }
 }
 
 impl PolicyBundle {
@@ -63,8 +90,8 @@ impl PolicyBundle {
         Self::placeholder()
     }
 
-    pub fn validate(&self, now_unix_time_ms: u64) -> bool {
-        // TODO: Add signature verification once policy bundles are signed and pinned.
+    pub fn validate(&self, now_unix_time_ms: u64, options: &PolicyValidationOptions) -> bool {
+        // Signature validation is enforced when AGENT_POLICY_SIGNING_KEY is set.
         let limits = ValidationLimits::default_limits();
         if self.schema_version == 0 {
             return false;
@@ -77,6 +104,11 @@ impl PolicyBundle {
         }
         if !validate_bounded_string(&self.signature, limits.max_payload_len) {
             return false;
+        }
+        if let Some(expected_key_id) = &options.expected_key_id {
+            if &self.signing_key_id != expected_key_id {
+                return false;
+            }
         }
         if self.issued_at_unix_time_ms > self.expires_at_unix_time_ms {
             return false;
@@ -121,11 +153,54 @@ impl PolicyBundle {
             }
         }
 
+        if let Some(signing_key) = &options.signing_key {
+            if !self.verify_signature(signing_key) {
+                return false;
+            }
+        } else if !options.allow_unsigned {
+            return false;
+        }
+
         true
     }
 
     pub fn allows_action(&self, action: &str) -> bool {
         self.execution.allowed_actions.iter().any(|item| item == action)
+    }
+
+    fn signing_payload(&self) -> String {
+        let mut payload = String::new();
+        payload.push_str("schema_version=");
+        payload.push_str(&self.schema_version.to_string());
+        payload.push_str("|version=");
+        payload.push_str(&self.version);
+        payload.push_str("|issued_at=");
+        payload.push_str(&self.issued_at_unix_time_ms.to_string());
+        payload.push_str("|expires_at=");
+        payload.push_str(&self.expires_at_unix_time_ms.to_string());
+        payload.push_str("|signing_key_id=");
+        payload.push_str(&self.signing_key_id);
+        payload.push_str("|allowed_actions=");
+        payload.push_str(&self.execution.allowed_actions.join(","));
+        payload.push_str("|max_arguments=");
+        payload.push_str(&self.execution.max_arguments.to_string());
+        payload.push_str("|max_argument_length=");
+        payload.push_str(&self.execution.max_argument_length.to_string());
+        payload.push_str("|telemetry_streams=");
+        payload.push_str(&self.telemetry_streams.join(","));
+        payload
+    }
+
+    fn verify_signature(&self, signing_key: &str) -> bool {
+        let payload = self.signing_payload();
+        let mut mac = match Hmac::<Sha256>::new_from_slice(signing_key.as_bytes()) {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+        mac.update(payload.as_bytes());
+        let signature_bytes = mac.finalize().into_bytes();
+        let expected = BASE64_STANDARD.encode(signature_bytes);
+        constant_time_eq(self.signature.as_bytes(), expected.as_bytes())
     }
 }
 
@@ -133,4 +208,15 @@ fn is_valid_action_name(action: &str) -> bool {
     action
         .chars()
         .all(|ch| ch.is_ascii_lowercase() || ch == '-' || ch == '_')
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (lhs, rhs) in left.iter().zip(right.iter()) {
+        diff |= lhs ^ rhs;
+    }
+    diff == 0
 }

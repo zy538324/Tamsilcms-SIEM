@@ -56,7 +56,8 @@ async fn main() {
 
     let policy = PolicyBundle::from_env();
     let policy_now = unix_time_ms();
-    if !policy.validate(policy_now) {
+    let validation_options = crate::policy::PolicyValidationOptions::from_env();
+    if !policy.validate(policy_now, &validation_options) {
         warn!("policy validation failed; refusing to start services");
         return;
     }

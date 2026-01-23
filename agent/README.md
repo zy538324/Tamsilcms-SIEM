@@ -49,5 +49,7 @@ Each service has its own ACLs, narrow IPC surface, and can be restarted independ
 - `config/agent.env` provides a starter environment file for shared key and identity defaults.
 - `AGENT_IPC_PIPE` overrides the named pipe endpoint used by Rust core and C++ providers.
 - `AGENT_POLICY_PATH` or `AGENT_POLICY_JSON` provides the signed policy bundle (including time window + signature metadata) the Rust core validates before routing.
+- `AGENT_POLICY_SIGNING_KEY` provides the shared signing key for policy HMAC validation; `AGENT_POLICY_SIGNING_KEY_ID` pins the expected key ID.
+- `AGENT_POLICY_ALLOW_UNSIGNED=true` explicitly allows unsigned policy bundles for development only.
 
 For architecture details, see `docs/agent-architecture.md`.
