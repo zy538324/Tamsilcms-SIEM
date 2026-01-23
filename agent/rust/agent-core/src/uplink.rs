@@ -81,9 +81,46 @@ pub struct UplinkSummary {
     pub completed_at_unix_ms: u64,
 }
 
+#[derive(Debug, Clone)]
+pub struct UplinkWorkerConfig {
+    pub interval_secs: u64,
+}
+
+impl UplinkWorkerConfig {
+    pub fn from_env() -> Self {
+        let interval_secs = std::env::var("RUST_UPLINK_INTERVAL_SECS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(30);
+        Self { interval_secs }
+    }
+}
+
 pub async fn process_uplink_queue() -> UplinkSummary {
     let config = UplinkConfig::from_env();
     process_uplink_queue_with_config(&config).await
+}
+
+pub async fn run_uplink_worker() {
+    let config = UplinkConfig::from_env();
+    let worker = UplinkWorkerConfig::from_env();
+
+    info!(
+        interval_secs = worker.interval_secs,
+        queue_dir = %config.queue_dir.display(),
+        "uplink worker started"
+    );
+
+    loop {
+        let summary = process_uplink_queue_with_config(&config).await;
+        info!(
+            processed = summary.processed,
+            succeeded = summary.succeeded,
+            failed = summary.failed,
+            "uplink worker cycle complete"
+        );
+        tokio::time::sleep(std::time::Duration::from_secs(worker.interval_secs)).await;
+    }
 }
 
 pub async fn process_uplink_queue_with_config(config: &UplinkConfig) -> UplinkSummary {

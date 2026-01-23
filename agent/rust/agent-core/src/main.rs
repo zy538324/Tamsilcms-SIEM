@@ -40,7 +40,7 @@ use crate::service_registry::{ServiceDescriptor, ServiceRegistry};
 use crate::siem::prepare_telemetry_batch;
 use crate::telemetry_router::{route_telemetry, TelemetryPayload};
 use crate::time::unix_time_ms;
-use crate::uplink::process_uplink_queue;
+use crate::uplink::{process_uplink_queue, run_uplink_worker};
 use crate::vulnerability::assess_exposure;
 
 #[tokio::main]
@@ -102,6 +102,7 @@ async fn main() {
         checksum_sha256: Some("checksum-placeholder".to_string()),
     }, &policy);
     let _uplink_summary = process_uplink_queue().await;
+    tokio::spawn(run_uplink_worker());
     let _command_routed = route_command(SignedCommand {
         command_id: "cmd-placeholder".to_string(),
         signed_payload: "payload-placeholder".to_string(),
