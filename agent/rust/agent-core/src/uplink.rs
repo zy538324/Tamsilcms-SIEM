@@ -12,7 +12,9 @@ pub struct UplinkConfig {
     pub intake_endpoint: String,
     pub rmm_endpoint: String,
     pub rmm_base_endpoint: String,
+    pub rmm_mtls_base_endpoint: String,
     pub patch_endpoint: String,
+    pub inventory_base_endpoint: String,
     pub api_key: Option<String>,
     pub queue_dir: PathBuf,
     pub max_items_per_cycle: usize,
@@ -32,10 +34,18 @@ impl UplinkConfig {
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| "http://localhost:8020/rmm".to_string());
+        let rmm_mtls_base_endpoint = std::env::var("TAMSIL_RMM_MTLS_BASE_ENDPOINT")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "http://localhost:8020/mtls/rmm".to_string());
         let patch_endpoint = std::env::var("TAMSIL_PSA_PATCH_ENDPOINT")
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| "http://localhost:8001/patch-results".to_string());
+        let inventory_base_endpoint = std::env::var("TAMSIL_INVENTORY_BASE_ENDPOINT")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "http://localhost:8020/mtls/inventory".to_string());
         let api_key = std::env::var("TAMSIL_UPLINK_API_KEY")
             .ok()
             .filter(|value| !value.trim().is_empty());
@@ -51,7 +61,9 @@ impl UplinkConfig {
             intake_endpoint,
             rmm_endpoint,
             rmm_base_endpoint,
+            rmm_mtls_base_endpoint,
             patch_endpoint,
+            inventory_base_endpoint,
             api_key,
             queue_dir,
             max_items_per_cycle,
@@ -79,6 +91,10 @@ enum UplinkQueueItem {
     Patch { payload_json: String },
     #[serde(rename = "rmm")]
     Rmm { path: String, payload_json: String },
+    #[serde(rename = "mtls_rmm")]
+    MtlsRmm { path: String, payload_json: String },
+    #[serde(rename = "inventory")]
+    Inventory { path: String, payload_json: String },
 }
 
 #[derive(Debug, Clone)]
@@ -233,6 +249,14 @@ async fn handle_queue_item(
         UplinkQueueItem::Patch { payload_json } => Ok(post_json(client, &config.patch_endpoint, &payload_json).await),
         UplinkQueueItem::Rmm { path, payload_json } => {
             let endpoint = join_endpoint(&config.rmm_base_endpoint, &path);
+            Ok(post_json(client, &endpoint, &payload_json).await)
+        }
+        UplinkQueueItem::MtlsRmm { path, payload_json } => {
+            let endpoint = join_endpoint(&config.rmm_mtls_base_endpoint, &path);
+            Ok(post_json(client, &endpoint, &payload_json).await)
+        }
+        UplinkQueueItem::Inventory { path, payload_json } => {
+            let endpoint = join_endpoint(&config.inventory_base_endpoint, &path);
             Ok(post_json(client, &endpoint, &payload_json).await)
         }
     }
