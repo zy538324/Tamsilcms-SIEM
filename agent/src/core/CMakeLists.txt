@@ -6,12 +6,11 @@ add_library(agent_core_lib STATIC
     ../agent_rmm.cpp
     ../agent_config.cpp
     ../agent_system.cpp
-    uplink.cpp
     ipc_server.cpp
 )
 
 target_include_directories(agent_core_lib PRIVATE ../../include)
-target_link_libraries(agent_core_lib PRIVATE ${AGENT_LIBS} CURL::libcurl OpenSSL::Crypto agent_stubs)
+target_link_libraries(agent_core_lib PRIVATE ${AGENT_LIBS} OpenSSL::Crypto agent_stubs)
 
 add_executable(agent_core
     main.cpp

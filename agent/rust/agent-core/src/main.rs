@@ -22,6 +22,7 @@ mod service_registry;
 mod siem;
 mod telemetry_router;
 mod time;
+mod uplink;
 mod update;
 mod vulnerability;
 
@@ -39,6 +40,7 @@ use crate::service_registry::{ServiceDescriptor, ServiceRegistry};
 use crate::siem::prepare_telemetry_batch;
 use crate::telemetry_router::{route_telemetry, TelemetryPayload};
 use crate::time::unix_time_ms;
+use crate::uplink::process_uplink_queue;
 use crate::vulnerability::assess_exposure;
 
 #[tokio::main]
@@ -52,7 +54,11 @@ async fn main() {
 
     info!(asset_id = %identity.asset_id, agent_id = %identity.agent_id, "agent core starting");
 
-    verify_trust_bundle();
+    let trust_report = verify_trust_bundle();
+    if !trust_report.verified {
+        warn!("trust bundle verification failed; refusing to start services");
+        return;
+    }
 
     let policy = PolicyBundle::from_env();
     let policy_now = unix_time_ms();
@@ -92,7 +98,10 @@ async fn main() {
     let _telemetry_routed = route_telemetry(TelemetryPayload {
         stream: "sensor".to_string(),
         payload_bytes: 1,
+        event_count: 1,
+        checksum_sha256: Some("checksum-placeholder".to_string()),
     }, &policy);
+    let _uplink_summary = process_uplink_queue().await;
     let _command_routed = route_command(SignedCommand {
         command_id: "cmd-placeholder".to_string(),
         signed_payload: "payload-placeholder".to_string(),
