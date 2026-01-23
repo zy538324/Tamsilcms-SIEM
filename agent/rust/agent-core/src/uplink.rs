@@ -11,6 +11,7 @@ use crate::time::unix_time_ms;
 pub struct UplinkConfig {
     pub intake_endpoint: String,
     pub rmm_endpoint: String,
+    pub rmm_base_endpoint: String,
     pub patch_endpoint: String,
     pub api_key: Option<String>,
     pub queue_dir: PathBuf,
@@ -27,6 +28,10 @@ impl UplinkConfig {
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| "http://localhost:8020/rmm/evidence".to_string());
+        let rmm_base_endpoint = std::env::var("TAMSIL_RMM_BASE_ENDPOINT")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "http://localhost:8020/rmm".to_string());
         let patch_endpoint = std::env::var("TAMSIL_PSA_PATCH_ENDPOINT")
             .ok()
             .filter(|value| !value.trim().is_empty())
@@ -45,6 +50,7 @@ impl UplinkConfig {
         Self {
             intake_endpoint,
             rmm_endpoint,
+            rmm_base_endpoint,
             patch_endpoint,
             api_key,
             queue_dir,
@@ -71,6 +77,8 @@ enum UplinkQueueItem {
     },
     #[serde(rename = "patch")]
     Patch { payload_json: String },
+    #[serde(rename = "rmm")]
+    Rmm { path: String, payload_json: String },
 }
 
 #[derive(Debug, Clone)]
@@ -223,6 +231,10 @@ async fn handle_queue_item(
             Ok(intake_ok && rmm_ok)
         }
         UplinkQueueItem::Patch { payload_json } => Ok(post_json(client, &config.patch_endpoint, &payload_json).await),
+        UplinkQueueItem::Rmm { path, payload_json } => {
+            let endpoint = join_endpoint(&config.rmm_base_endpoint, &path);
+            Ok(post_json(client, &endpoint, &payload_json).await)
+        }
     }
 }
 
@@ -332,6 +344,16 @@ fn normalise_fallback(value: &str, alternate: &str, fallback: &str) -> String {
     } else {
         fallback.to_string()
     }
+}
+
+fn join_endpoint(base: &str, path: &str) -> String {
+    let trimmed_base = base.trim_end_matches('/');
+    let trimmed_path = if path.starts_with('/') {
+        path.to_string()
+    } else {
+        format!("/{path}")
+    };
+    format!("{trimmed_base}{trimmed_path}")
 }
 
 fn is_json_file(path: &Path) -> bool {
