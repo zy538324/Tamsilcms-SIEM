@@ -7,6 +7,7 @@ use serde::Deserialize;
 use crate::security::{validate_bounded_string, ValidationLimits};
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExecutionPolicy {
     pub allowed_actions: Vec<String>,
     pub max_arguments: usize,
@@ -14,8 +15,14 @@ pub struct ExecutionPolicy {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PolicyBundle {
+    pub schema_version: u32,
     pub version: String,
+    pub issued_at_unix_time_ms: u64,
+    pub expires_at_unix_time_ms: u64,
+    pub signing_key_id: String,
+    pub signature: String,
     pub execution: ExecutionPolicy,
     pub telemetry_streams: Vec<String>,
 }
@@ -23,7 +30,12 @@ pub struct PolicyBundle {
 impl PolicyBundle {
     pub fn placeholder() -> Self {
         Self {
+            schema_version: 1,
             version: "policy-placeholder".to_string(),
+            issued_at_unix_time_ms: 0,
+            expires_at_unix_time_ms: u64::MAX,
+            signing_key_id: "signing-key-placeholder".to_string(),
+            signature: "signature-placeholder".to_string(),
             execution: ExecutionPolicy {
                 allowed_actions: vec!["script-run".to_string(), "patch-apply".to_string()],
                 max_arguments: 8,
@@ -51,10 +63,27 @@ impl PolicyBundle {
         Self::placeholder()
     }
 
-    pub fn validate(&self) -> bool {
+    pub fn validate(&self, now_unix_time_ms: u64) -> bool {
         // TODO: Add signature verification once policy bundles are signed and pinned.
         let limits = ValidationLimits::default_limits();
+        if self.schema_version == 0 {
+            return false;
+        }
         if !validate_bounded_string(&self.version, 64) {
+            return false;
+        }
+        if !validate_bounded_string(&self.signing_key_id, 128) {
+            return false;
+        }
+        if !validate_bounded_string(&self.signature, limits.max_payload_len) {
+            return false;
+        }
+        if self.issued_at_unix_time_ms > self.expires_at_unix_time_ms {
+            return false;
+        }
+        if now_unix_time_ms < self.issued_at_unix_time_ms
+            || now_unix_time_ms > self.expires_at_unix_time_ms
+        {
             return false;
         }
 

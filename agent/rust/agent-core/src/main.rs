@@ -55,7 +55,8 @@ async fn main() {
     verify_trust_bundle();
 
     let policy = PolicyBundle::from_env();
-    if !policy.validate() {
+    let policy_now = unix_time_ms();
+    if !policy.validate(policy_now) {
         warn!("policy validation failed; refusing to start services");
         return;
     }
