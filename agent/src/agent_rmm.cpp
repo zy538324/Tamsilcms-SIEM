@@ -1,10 +1,12 @@
 // agent_rmm.cpp
-// RMM telemetry emission using lightweight JSON and libcurl.
+// RMM telemetry emission using lightweight JSON and the Rust uplink queue.
 #include "agent_rmm.h"
 
-#include <curl/curl.h>
-
 #include <chrono>
+#include <cctype>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -13,6 +15,22 @@
 namespace agent_rmm {
 
 namespace {
+std::string SanitiseFilenameToken(const std::string& input) {
+    std::string output;
+    output.reserve(input.size());
+    for (const char c : input) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_') {
+            output.push_back(c);
+        } else {
+            output.push_back('_');
+        }
+    }
+    if (output.empty()) {
+        return "unnamed";
+    }
+    return output;
+}
+
 std::string JsonEscape(const std::string& input) {
     std::ostringstream escaped;
     for (char c : input) {
@@ -64,29 +82,42 @@ std::string BuildIsoTimestamp(const std::chrono::system_clock::time_point& time_
     return stream.str();
 }
 
-bool PostJson(const std::string& url, const std::string& body) {
-    CURL* curl = curl_easy_init();
-    if (!curl) {
+bool EnqueueUplinkRmmPayload(
+    const std::string& queue_dir,
+    const std::string& category,
+    const std::string& path,
+    const std::string& payload
+) {
+    if (queue_dir.empty() || payload.empty() || path.empty()) {
+        std::cerr << "[RMM] Missing queue directory, path, or payload for uplink." << std::endl;
         return false;
     }
 
-    struct curl_slist* headers = nullptr;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-    headers = curl_slist_append(headers, "X-Forwarded-Proto: https");
+    std::filesystem::path queue_path(queue_dir);
+    std::filesystem::create_directories(queue_path);
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+    const auto now_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string safe_category = SanitiseFilenameToken(category);
+    std::filesystem::path payload_path = queue_path / ("rmm_" + safe_category + "_" + std::to_string(now_epoch) + ".json");
 
-    CURLcode result = curl_easy_perform(curl);
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
+    std::ofstream out(payload_path);
+    if (!out) {
+        std::cerr << "[RMM] Unable to write uplink queue item: " << payload_path << std::endl;
+        return false;
+    }
 
-    return result == CURLE_OK;
-}
+    std::string json;
+    json.reserve(payload.size() + path.size() + 64);
+    json += "{";
+    json += "\"kind\":\"rmm\",";
+    json += "\"path\":\"" + JsonEscape(path) + "\",";
+    json += "\"payload_json\":\"" + JsonEscape(payload) + "\"";
+    json += "}";
 
-std::string BuildEndpoint(const agent::Config& config, const std::string& path) {
-    return config.transport_url + "/rmm" + path;
+    out << json;
+    out.close();
+    return true;
 }
 
 void AppendString(std::ostringstream& stream, const std::string& key, const std::string& value, bool trailing_comma = true) {
@@ -120,7 +151,9 @@ bool RmmTelemetryClient::SendConfigProfile(const RmmConfigProfile& profile) cons
     AppendString(payload, "description", profile.description, false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/configuration_profiles"), payload.str());
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool ok = EnqueueUplinkRmmPayload(queue_path, "config_profile", "/configuration_profiles", payload.str());
     LogOutcome("config_profile", correlation_id, ok);
     return ok;
 }
@@ -128,6 +161,8 @@ bool RmmTelemetryClient::SendConfigProfile(const RmmConfigProfile& profile) cons
 bool RmmTelemetryClient::SendPatchCatalog(const std::vector<RmmPatchCatalogItem>& items) const {
     std::string correlation_id = GenerateCorrelationId();
     bool ok = true;
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
     for (const auto& item : items) {
         std::ostringstream payload;
         payload << '{';
@@ -138,7 +173,7 @@ bool RmmTelemetryClient::SendPatchCatalog(const std::vector<RmmPatchCatalogItem>
         AppendInt(payload, "severity", item.severity, false);
         payload << '}';
 
-        ok = PostJson(BuildEndpoint(config_, "/patch_catalog"), payload.str()) && ok;
+        ok = EnqueueUplinkRmmPayload(queue_path, "patch_catalog", "/patch_catalog", payload.str()) && ok;
     }
     LogOutcome("patch_catalog", correlation_id, ok);
     return ok;
@@ -153,7 +188,9 @@ bool RmmTelemetryClient::SendPatchJob(const RmmPatchJob& job) const {
     AppendString(payload, "reboot_policy", job.reboot_policy, false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/patch_jobs"), payload.str());
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool ok = EnqueueUplinkRmmPayload(queue_path, "patch_job", "/patch_jobs", payload.str());
     LogOutcome("patch_job", correlation_id, ok);
     return ok;
 }
@@ -169,7 +206,9 @@ bool RmmTelemetryClient::SendScriptResult(const RmmScriptResult& result) const {
     AppendString(payload, "hash", result.hash, false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/script_results"), payload.str());
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool ok = EnqueueUplinkRmmPayload(queue_path, "script_result", "/script_results", payload.str());
     LogOutcome("script_result", correlation_id, ok);
     return ok;
 }
@@ -183,7 +222,9 @@ bool RmmTelemetryClient::SendRemoteSession(const RmmRemoteSession& session) cons
     AppendString(payload, "session_type", session.session_type, false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/remote_sessions"), payload.str());
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool ok = EnqueueUplinkRmmPayload(queue_path, "remote_session", "/remote_sessions", payload.str());
     LogOutcome("remote_session", correlation_id, ok);
     return ok;
 }
@@ -200,7 +241,9 @@ bool RmmTelemetryClient::SendEvidenceRecord(const RmmEvidenceRecord& record) con
     AppendString(payload, "storage_uri", record.storage_uri);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/evidence"), payload.str());
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool ok = EnqueueUplinkRmmPayload(queue_path, "evidence", "/evidence", payload.str());
     LogOutcome("evidence", correlation_id, ok);
     return ok;
 }
@@ -217,7 +260,9 @@ bool RmmTelemetryClient::SendDeviceInventory(const RmmDeviceInventory& inventory
     AppendString(payload, "collected_at", BuildIsoTimestamp(inventory.collected_at), false);
     payload << '}';
 
-    bool ok = PostJson(BuildEndpoint(config_, "/device_inventory"), payload.str());
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool ok = EnqueueUplinkRmmPayload(queue_path, "device_inventory", "/device_inventory", payload.str());
     LogOutcome("device_inventory", correlation_id, ok);
     return ok;
 }

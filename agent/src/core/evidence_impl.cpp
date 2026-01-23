@@ -8,15 +8,88 @@
 #include <iostream>
 #include <filesystem>
 #include <mutex>
-#include "../../include/agent_uplink.h"
 #include "../../include/agent_config.h"
-#include "../../include/agent_rmm.h"
 
 namespace fs = std::filesystem;
 
 static std::mutex g_evidence_mutex;
 
 namespace agent_evidence {
+
+namespace {
+std::string EscapeJsonString(const std::string& input) {
+    std::string escaped;
+    escaped.reserve(input.size() + 8);
+    for (char c : input) {
+        switch (c) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\t':
+                escaped += "\\t";
+                break;
+            default:
+                escaped += c;
+                break;
+        }
+    }
+    return escaped;
+}
+
+bool EnqueueUplinkEvidence(
+    const std::string& queue_dir,
+    const std::string& evidence_id,
+    const std::string& tenant_id,
+    const std::string& asset_id,
+    const std::string& source,
+    const std::string& type,
+    const std::string& related_id,
+    const std::string& hash,
+    const std::string& storage_uri,
+    const std::string& captured_at
+) {
+    if (queue_dir.empty() || evidence_id.empty() || hash.empty()) {
+        std::cerr << "EnqueueUplinkEvidence: missing required fields\n";
+        return false;
+    }
+
+    fs::path queue_path(queue_dir);
+    fs::create_directories(queue_path);
+    fs::path payload_path = queue_path / ("evidence_" + evidence_id + ".json");
+
+    std::ofstream out(payload_path);
+    if (!out) {
+        std::cerr << "EnqueueUplinkEvidence: unable to write " << payload_path << std::endl;
+        return false;
+    }
+
+    std::string json = "{";
+    json += "\"kind\":\"evidence\",";
+    json += "\"evidence_id\":\"" + EscapeJsonString(evidence_id) + "\",";
+    json += "\"tenant_id\":\"" + EscapeJsonString(tenant_id) + "\",";
+    json += "\"asset_id\":\"" + EscapeJsonString(asset_id) + "\",";
+    json += "\"source\":\"" + EscapeJsonString(source) + "\",";
+    json += "\"type\":\"" + EscapeJsonString(type) + "\",";
+    json += "\"related_id\":\"" + EscapeJsonString(related_id) + "\",";
+    json += "\"hash\":\"" + EscapeJsonString(hash) + "\",";
+    json += "\"storage_uri\":\"" + EscapeJsonString(storage_uri) + "\",";
+    json += "\"captured_at\":\"" + EscapeJsonString(captured_at) + "\"";
+    json += "}";
+
+    out << json;
+    out.close();
+    return true;
+}
+} // namespace
 
 static std::string ComputeSHA256Hex(const std::string& path) {
     std::ifstream ifs(path, std::ios::binary);
@@ -100,25 +173,30 @@ void EvidenceBroker::UploadEvidence(const std::string& evidence_id) {
                 return;
             }
 
-            agent_rmm::RmmTelemetryClient rmm_client(config);
-            agent_rmm::RmmEvidenceRecord record{};
-            record.asset_id = config.asset_id;
-            record.evidence_type = it.type;
-            record.related_entity = "agent";
-            record.related_id = it.related_id.empty() ? it.evidence_id : it.related_id;
-            record.hash = it.hash;
-            record.storage_uri = "file://" + outdir.string();
-            rmm_client.SendEvidenceRecord(record);
-
-            // Upload via uplink
             std::string packagedir = (fs::current_path() / "evidence_packages" / it.evidence_id).string();
-            bool ok = agent_uplink::UploadEvidencePackage(packagedir);
-            if (ok) std::cout << "Evidence package uploaded: " << packagedir << std::endl;
-            else std::cerr << "Evidence upload failed for: " << packagedir << std::endl;
-
-            bool rmm_ok = agent_uplink::UploadRmmEvidence(packagedir);
-            if (rmm_ok) std::cout << "RMM evidence uploaded: " << packagedir << std::endl;
-            else std::cerr << "RMM evidence upload failed for: " << packagedir << std::endl;
+            std::string storage_uri = "file://" + packagedir;
+            std::string captured_at = std::to_string(std::chrono::duration_cast<std::chrono::seconds>(
+                it.captured_at.time_since_epoch()).count());
+            std::string queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR")
+                ? std::getenv("RUST_UPLINK_QUEUE_DIR")
+                : "uplink_queue";
+            bool queued = EnqueueUplinkEvidence(
+                queue_dir,
+                it.evidence_id,
+                config.tenant_id,
+                config.asset_id,
+                it.source,
+                it.type,
+                it.related_id.empty() ? it.evidence_id : it.related_id,
+                it.hash,
+                storage_uri,
+                captured_at
+            );
+            if (queued) {
+                std::cout << "Evidence package queued for uplink: " << packagedir << std::endl;
+            } else {
+                std::cerr << "Evidence uplink queue failed for: " << packagedir << std::endl;
+            }
             return;
         }
     }
