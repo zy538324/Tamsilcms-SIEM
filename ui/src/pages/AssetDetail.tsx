@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchAssets } from "../api/assets";
 import { fetchAssetPatchState } from "../api/patch";
+import {
+  fetchAssetInventoryOverview,
+  fetchInventorySnapshot,
+  fetchTelemetryMetrics,
+  type AssetInventoryOverviewResponse,
+  type InventorySnapshotResponse,
+  type TelemetryMetricSummaryResponse
+} from "../api/ingestion";
 import SectionHeader from "../components/SectionHeader";
 import { assetDetails, assets } from "../data/assets";
 import type { Asset } from "../data/assets";
@@ -27,6 +35,54 @@ const buildDefaultDetail = (asset: Asset) => ({
   tickets: ["No tickets linked."],
   compliancePosture: "Compliance posture unavailable"
 });
+
+const formatMetricValue = (metric?: TelemetryMetricSummaryResponse) => {
+  if (!metric) {
+    return "Unavailable";
+  }
+  const rounded = Number.isFinite(metric.last_value)
+    ? metric.last_value.toFixed(2)
+    : `${metric.last_value}`;
+  return metric.unit ? `${rounded} ${metric.unit}` : `${rounded}`;
+};
+
+const buildDetailFromIngestion = (
+  asset: Asset,
+  overview?: AssetInventoryOverviewResponse,
+  snapshot?: InventorySnapshotResponse,
+  metrics?: TelemetryMetricSummaryResponse[]
+) => {
+  const osLabel = overview?.os_name
+    ? `${overview.os_name}${overview.os_version ? ` ${overview.os_version}` : ""}`
+    : "Unknown";
+  const hardwareLabel = snapshot?.hardware?.model ?? overview?.hardware_model ?? "Unknown";
+  const metricMap = new Map(
+    (metrics ?? []).map((metric) => [metric.name.toLowerCase(), metric])
+  );
+  const findMetric = (needle: string) =>
+    [...metricMap.entries()].find(([key]) => key.includes(needle))?.[1];
+
+  return {
+    metadata: {
+      location: hardwareLabel,
+      environment: osLabel,
+      owner: overview?.tenant_id ?? asset.owner,
+      lastPatch: "Unavailable"
+    },
+    telemetry: {
+      cpu: formatMetricValue(findMetric("cpu")),
+      memory: formatMetricValue(findMetric("mem")),
+      uptime: formatMetricValue(findMetric("uptime"))
+    },
+    recentEvents: ["No recent events recorded."],
+    findings: ["No findings recorded."],
+    vulnerabilities: ["No vulnerability data recorded."],
+    patchState: "Patch state unavailable",
+    defenceActions: ["No defence actions recorded."],
+    tickets: ["No tickets linked."],
+    compliancePosture: "Compliance posture unavailable"
+  };
+};
 
 const AssetDetail = () => {
   const { assetId } = useParams();
@@ -74,6 +130,27 @@ const AssetDetail = () => {
           ...baseDetail,
           patchState: updatedState
         });
+      })
+      .catch(() => {
+        setDetail(fallbackDetail ?? (asset ? buildDefaultDetail(asset) : undefined));
+      });
+
+    return () => controller.abort();
+  }, [asset, assetId, fallbackDetail]);
+
+  useEffect(() => {
+    if (!assetId || !asset) {
+      return undefined;
+    }
+    const controller = new AbortController();
+
+    Promise.all([
+      fetchAssetInventoryOverview(assetId, controller.signal),
+      fetchInventorySnapshot(assetId, controller.signal),
+      fetchTelemetryMetrics(assetId, controller.signal)
+    ])
+      .then(([overview, snapshot, metrics]) => {
+        setDetail(buildDetailFromIngestion(asset, overview, snapshot, metrics));
       })
       .catch(() => {
         setDetail(fallbackDetail ?? (asset ? buildDefaultDetail(asset) : undefined));
