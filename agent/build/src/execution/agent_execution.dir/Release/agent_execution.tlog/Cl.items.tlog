@@ -1,7 +1,0 @@
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\main.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\execution\agent_execution.dir\Release\main.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\service_entry.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\execution\agent_execution.dir\Release\service_entry.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\ExecutionService_stub.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\execution\agent_execution.dir\Release\ExecutionService_stub.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\execution\RegisterService_stub.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\execution\agent_execution.dir\Release\RegisterService_stub.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_rmm.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\execution\agent_execution.dir\Release\agent_rmm.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_config.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\execution\agent_execution.dir\Release\agent_config.obj
-C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\src\agent_system.cpp;C:\Users\Matt.Palmer\Documents\GitHub\Tamsilcms-SIEM\agent\build\src\execution\agent_execution.dir\Release\agent_system.obj
