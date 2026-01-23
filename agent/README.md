@@ -53,3 +53,4 @@ Each service has its own ACLs, narrow IPC surface, and can be restarted independ
 - `AGENT_POLICY_ALLOW_UNSIGNED=true` explicitly allows unsigned policy bundles for development only.
 
 For architecture details, see `docs/agent-architecture.md`.
+Policy bundle schema and signing details live in `docs/policy-bundle.md`.

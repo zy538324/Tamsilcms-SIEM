@@ -208,6 +208,57 @@ impl PolicyBundle {
         let expected = BASE64_STANDARD.encode(signature_bytes);
         constant_time_eq(self.signature.as_bytes(), expected.as_bytes())
     }
+
+    pub fn sign_with_key(&mut self, signing_key: &str) -> bool {
+        let payload = self.signing_payload();
+        let mut mac = match Hmac::<Sha256>::new_from_slice(signing_key.as_bytes()) {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+        mac.update(payload.as_bytes());
+        let signature_bytes = mac.finalize().into_bytes();
+        self.signature = BASE64_STANDARD.encode(signature_bytes);
+        true
+    }
+
+    pub fn allows_action(&self, action: &str) -> bool {
+        self.execution.allowed_actions.iter().any(|item| item == action)
+    }
+
+    fn signing_payload(&self) -> String {
+        let mut payload = String::new();
+        payload.push_str("schema_version=");
+        payload.push_str(&self.schema_version.to_string());
+        payload.push_str("|version=");
+        payload.push_str(&self.version);
+        payload.push_str("|issued_at=");
+        payload.push_str(&self.issued_at_unix_time_ms.to_string());
+        payload.push_str("|expires_at=");
+        payload.push_str(&self.expires_at_unix_time_ms.to_string());
+        payload.push_str("|signing_key_id=");
+        payload.push_str(&self.signing_key_id);
+        payload.push_str("|allowed_actions=");
+        payload.push_str(&self.execution.allowed_actions.join(","));
+        payload.push_str("|max_arguments=");
+        payload.push_str(&self.execution.max_arguments.to_string());
+        payload.push_str("|max_argument_length=");
+        payload.push_str(&self.execution.max_argument_length.to_string());
+        payload.push_str("|telemetry_streams=");
+        payload.push_str(&self.telemetry_streams.join(","));
+        payload
+    }
+
+    fn verify_signature(&self, signing_key: &str) -> bool {
+        let payload = self.signing_payload();
+        let mut mac = match Hmac::<Sha256>::new_from_slice(signing_key.as_bytes()) {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+        mac.update(payload.as_bytes());
+        let signature_bytes = mac.finalize().into_bytes();
+        let expected = BASE64_STANDARD.encode(signature_bytes);
+        constant_time_eq(self.signature.as_bytes(), expected.as_bytes())
+    }
 }
 
 fn is_valid_action_name(action: &str) -> bool {
@@ -284,5 +335,95 @@ mod tests {
             allow_unsigned: true,
         };
         assert!(!policy.validate(1, &options));
+    }
+}
+
+fn is_valid_action_name(action: &str) -> bool {
+    action
+        .chars()
+        .all(|ch| ch.is_ascii_lowercase() || ch == '-' || ch == '_')
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (lhs, rhs) in left.iter().zip(right.iter()) {
+        diff |= lhs ^ rhs;
+    }
+    diff == 0
+}
+
+fn is_sorted(values: &[String]) -> bool {
+    values.windows(2).all(|pair| pair[0] <= pair[1])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PolicyBundle, PolicyValidationOptions};
+
+    fn build_valid_policy() -> PolicyBundle {
+        PolicyBundle {
+            schema_version: 1,
+            version: "policy-1".to_string(),
+            issued_at_unix_time_ms: 0,
+            expires_at_unix_time_ms: u64::MAX,
+            signing_key_id: "key-1".to_string(),
+            signature: "placeholder".to_string(),
+            execution: super::ExecutionPolicy {
+                allowed_actions: vec!["patch-apply".to_string(), "script-run".to_string()],
+                max_arguments: 4,
+                max_argument_length: 64,
+            },
+            telemetry_streams: vec!["agent".to_string(), "sensor".to_string()],
+        }
+    }
+
+    #[test]
+    fn validates_when_unsigned_allowed() {
+        let policy = build_valid_policy();
+        let options = PolicyValidationOptions {
+            signing_key: None,
+            expected_key_id: None,
+            allow_unsigned: true,
+        };
+        assert!(policy.validate(1, &options));
+    }
+
+    #[test]
+    fn rejects_when_unsigned_disallowed() {
+        let policy = build_valid_policy();
+        let options = PolicyValidationOptions {
+            signing_key: None,
+            expected_key_id: None,
+            allow_unsigned: false,
+        };
+        assert!(!policy.validate(1, &options));
+    }
+
+    #[test]
+    fn rejects_unsorted_lists() {
+        let mut policy = build_valid_policy();
+        policy.execution.allowed_actions = vec!["script-run".to_string(), "patch-apply".to_string()];
+        let options = PolicyValidationOptions {
+            signing_key: None,
+            expected_key_id: None,
+            allow_unsigned: true,
+        };
+        assert!(!policy.validate(1, &options));
+    }
+
+    #[test]
+    fn validates_with_signature_key() {
+        let mut policy = build_valid_policy();
+        let signing_key = "unit-test-key";
+        assert!(policy.sign_with_key(signing_key));
+        let options = PolicyValidationOptions {
+            signing_key: Some(signing_key.to_string()),
+            expected_key_id: None,
+            allow_unsigned: false,
+        };
+        assert!(policy.validate(1, &options));
     }
 }
