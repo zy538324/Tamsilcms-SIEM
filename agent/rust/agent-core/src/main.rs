@@ -13,6 +13,7 @@ mod ipc;
 mod ipc_validation;
 mod pipeline;
 mod policy;
+mod proto;
 mod rate_limit;
 mod rmm;
 mod security;
