@@ -70,55 +70,6 @@ impl PolicyBundle {
             },
             telemetry_streams: vec!["sensor".to_string(), "agent".to_string()],
         }
-        if !validate_bounded_string(&self.version, 64) {
-            return false;
-        }
-        if !validate_bounded_string(&self.signing_key_id, 128) {
-            return false;
-        }
-        if !validate_bounded_string(&self.signature, limits.max_payload_len) {
-            return false;
-        }
-        if let Some(expected_key_id) = &options.expected_key_id {
-            if &self.signing_key_id != expected_key_id {
-                return false;
-            }
-        }
-        if self.issued_at_unix_time_ms > self.expires_at_unix_time_ms {
-            return false;
-        }
-        if now_unix_time_ms < self.issued_at_unix_time_ms
-            || now_unix_time_ms > self.expires_at_unix_time_ms
-        {
-            return false;
-        }
-
-        if self.execution.allowed_actions.is_empty()
-            || self.execution.max_arguments == 0
-            || self.execution.max_argument_length == 0
-        {
-            return false;
-        }
-
-        let mut unique_actions = HashSet::new();
-        for action in &self.execution.allowed_actions {
-            if !validate_bounded_string(action, limits.max_command_id_len) {
-                return false;
-            }
-            if !is_valid_action_name(action) {
-                return false;
-            }
-            if !unique_actions.insert(action) {
-                return false;
-            }
-        }
-        if !is_sorted(&self.execution.allowed_actions) {
-            return false;
-        }
-
-        if self.telemetry_streams.is_empty() {
-            return false;
-        }
 
         let mut unique_streams = HashSet::new();
         for stream in &self.telemetry_streams {
@@ -169,6 +120,24 @@ impl PolicyBundle {
         payload.push_str("|telemetry_streams=");
         payload.push_str(&self.telemetry_streams.join(","));
         payload
+    }
+
+    pub fn from_env() -> Self {
+        if let Ok(path) = env::var("AGENT_POLICY_PATH") {
+            if let Ok(raw) = fs::read_to_string(path) {
+                if let Ok(policy) = serde_json::from_str::<PolicyBundle>(&raw) {
+                    return policy;
+                }
+            }
+        }
+
+        if let Ok(raw) = env::var("AGENT_POLICY_JSON") {
+            if let Ok(policy) = serde_json::from_str::<PolicyBundle>(&raw) {
+                return policy;
+            }
+        }
+
+        Self::placeholder()
     }
 
     pub fn from_env() -> Self {
@@ -471,5 +440,17 @@ mod tests {
         let mut policy = build_valid_policy();
         policy.execution.allowed_actions = vec!["script-run".to_string(), "patch-apply".to_string()];
         assert!(!policy.sign_with_key("unit-test-key"));
+    }
+
+    #[test]
+    fn rejects_when_signature_mismatch() {
+        let mut policy = build_valid_policy();
+        assert!(policy.sign_with_key("unit-test-key"));
+        let options = PolicyValidationOptions {
+            signing_key: Some("other-key".to_string()),
+            expected_key_id: None,
+            allow_unsigned: false,
+        };
+        assert!(!policy.validate(1, &options));
     }
 }
