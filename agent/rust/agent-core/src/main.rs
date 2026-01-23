@@ -15,6 +15,7 @@ mod pipeline;
 mod policy;
 mod rate_limit;
 mod rmm;
+mod security;
 mod service_registry;
 mod siem;
 mod telemetry_router;
