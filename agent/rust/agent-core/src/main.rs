@@ -10,6 +10,7 @@ mod edr;
 mod evidence;
 mod identity;
 mod ipc;
+mod ipc_router;
 mod ipc_validation;
 mod pipeline;
 mod policy;

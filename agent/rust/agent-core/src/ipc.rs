@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::ipc_validation::{validate_payload_size, validate_proto_envelope, validate_schema_version, EnvelopeMeta};
+use crate::ipc_router::route_proto_envelope;
 use crate::rate_limit::RateLimiter;
 
 pub const IPC_SCHEMA_VERSION: u32 = 1;
@@ -41,5 +42,12 @@ impl IpcServer {
 
     pub fn validate_proto(&self, envelope: &crate::proto::agent_ipc::Envelope) -> bool {
         validate_proto_envelope(envelope, IPC_SCHEMA_VERSION, self.max_payload_bytes)
+    }
+
+    pub fn handle_proto(&self, envelope: &crate::proto::agent_ipc::Envelope) -> bool {
+        if !self.validate_proto(envelope) {
+            return false;
+        }
+        route_proto_envelope(envelope)
     }
 }
