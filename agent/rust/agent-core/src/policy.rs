@@ -70,55 +70,6 @@ impl PolicyBundle {
             },
             telemetry_streams: vec!["sensor".to_string(), "agent".to_string()],
         }
-
-        if let Some(signing_key) = &options.signing_key {
-            if !self.verify_signature(signing_key) {
-                return false;
-            }
-        } else if !options.allow_unsigned {
-            return false;
-        }
-
-        true
-    }
-
-    pub fn allows_action(&self, action: &str) -> bool {
-        self.execution.allowed_actions.iter().any(|item| item == action)
-    }
-
-    fn signing_payload(&self) -> String {
-        let mut payload = String::new();
-        payload.push_str("schema_version=");
-        payload.push_str(&self.schema_version.to_string());
-        payload.push_str("|version=");
-        payload.push_str(&self.version);
-        payload.push_str("|issued_at=");
-        payload.push_str(&self.issued_at_unix_time_ms.to_string());
-        payload.push_str("|expires_at=");
-        payload.push_str(&self.expires_at_unix_time_ms.to_string());
-        payload.push_str("|signing_key_id=");
-        payload.push_str(&self.signing_key_id);
-        payload.push_str("|allowed_actions=");
-        payload.push_str(&self.execution.allowed_actions.join(","));
-        payload.push_str("|max_arguments=");
-        payload.push_str(&self.execution.max_arguments.to_string());
-        payload.push_str("|max_argument_length=");
-        payload.push_str(&self.execution.max_argument_length.to_string());
-        payload.push_str("|telemetry_streams=");
-        payload.push_str(&self.telemetry_streams.join(","));
-        payload
-    }
-
-    fn verify_signature(&self, signing_key: &str) -> bool {
-        let payload = self.signing_payload();
-        let mut mac = match Hmac::<Sha256>::new_from_slice(signing_key.as_bytes()) {
-            Ok(value) => value,
-            Err(_) => return false,
-        };
-        mac.update(payload.as_bytes());
-        let signature_bytes = mac.finalize().into_bytes();
-        let expected = BASE64_STANDARD.encode(signature_bytes);
-        constant_time_eq(self.signature.as_bytes(), expected.as_bytes())
     }
 
     pub fn from_env() -> Self {
