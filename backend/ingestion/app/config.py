@@ -26,13 +26,15 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    database_dsn = os.environ.get("INGESTION_DATABASE_DSN", "").strip()
+    if not database_dsn:
+        raise ValueError(
+            "INGESTION_DATABASE_DSN is required. Define it in your environment or .env file."
+        )
     return Settings(
         environment=os.environ.get("INGESTION_ENV", "development"),
         service_name=os.environ.get("INGESTION_SERVICE_NAME", "ingestion-service"),
-        database_dsn=os.environ.get(
-            "INGESTION_DATABASE_DSN",
-            "postgresql://tamsilsiem:1792BigDirtyDykes!@10.252.0.25:5432/tamsilcmssiem?sslmode=require",
-        ),
+        database_dsn=database_dsn,
         database_min_connections=int(os.environ.get("INGESTION_DB_MIN_CONN", "1")),
         database_max_connections=int(os.environ.get("INGESTION_DB_MAX_CONN", "5")),
         telemetry_sample_limit=int(os.environ.get("INGESTION_TELEMETRY_SAMPLE_LIMIT", "500")),
