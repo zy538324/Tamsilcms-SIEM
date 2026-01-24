@@ -1,9 +1,9 @@
 #include "agent_inventory.h"
 
-#include <curl/curl.h>
-
 #include <chrono>
 #include <cctype>
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <optional>
@@ -22,6 +22,22 @@
 namespace agent {
 
 namespace {
+std::string SanitiseFilenameToken(const std::string& input) {
+    std::string output;
+    output.reserve(input.size());
+    for (const char c : input) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_') {
+            output.push_back(c);
+        } else {
+            output.push_back('_');
+        }
+    }
+    if (output.empty()) {
+        return "unnamed";
+    }
+    return output;
+}
+
 std::string JsonEscape(const std::string& input) {
     std::ostringstream escaped;
     for (char c : input) {
@@ -410,25 +426,42 @@ void AppendOptionalInt(
     }
 }
 
-bool PostJson(const std::string& url, const std::string& body) {
-    CURL* curl = curl_easy_init();
-    if (!curl) {
+bool EnqueueUplinkInventoryPayload(
+    const std::string& queue_dir,
+    const std::string& category,
+    const std::string& path,
+    const std::string& payload
+) {
+    if (queue_dir.empty() || payload.empty() || path.empty()) {
+        std::cerr << "[Inventory] Missing queue directory, path, or payload for uplink." << std::endl;
         return false;
     }
 
-    struct curl_slist* headers = nullptr;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-    headers = curl_slist_append(headers, "X-Forwarded-Proto: https");
+    std::filesystem::path queue_path(queue_dir);
+    std::filesystem::create_directories(queue_path);
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+    const auto now_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string safe_category = SanitiseFilenameToken(category);
+    std::filesystem::path payload_path = queue_path / ("inventory_" + safe_category + "_" + std::to_string(now_epoch) + ".json");
 
-    CURLcode result = curl_easy_perform(curl);
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
+    std::ofstream out(payload_path);
+    if (!out) {
+        std::cerr << "[Inventory] Unable to write uplink queue item: " << payload_path << std::endl;
+        return false;
+    }
 
-    return result == CURLE_OK;
+    std::string json;
+    json.reserve(payload.size() + path.size() + 64);
+    json += "{";
+    json += "\"kind\":\"inventory\",";
+    json += "\"path\":\"" + JsonEscape(path) + "\",";
+    json += "\"payload_json\":\"" + JsonEscape(payload) + "\"";
+    json += "}";
+
+    out << json;
+    out.close();
+    return true;
 }
 }  // namespace
 
@@ -555,11 +588,13 @@ bool SendInventorySnapshot(const Config& config) {
     groups << "]"
            << '}';
 
-    bool hardware_ok = PostJson(config.transport_url + "/mtls/inventory/hardware", hardware.str());
-    bool os_ok = PostJson(config.transport_url + "/mtls/inventory/os", os.str());
-    bool software_ok = PostJson(config.transport_url + "/mtls/inventory/software", software.str());
-    bool users_ok = PostJson(config.transport_url + "/mtls/inventory/users", users.str());
-    bool groups_ok = PostJson(config.transport_url + "/mtls/inventory/groups", groups.str());
+    const char* queue_dir = std::getenv("RUST_UPLINK_QUEUE_DIR");
+    std::string queue_path = queue_dir ? queue_dir : "uplink_queue";
+    bool hardware_ok = EnqueueUplinkInventoryPayload(queue_path, "hardware", "/hardware", hardware.str());
+    bool os_ok = EnqueueUplinkInventoryPayload(queue_path, "os", "/os", os.str());
+    bool software_ok = EnqueueUplinkInventoryPayload(queue_path, "software", "/software", software.str());
+    bool users_ok = EnqueueUplinkInventoryPayload(queue_path, "users", "/users", users.str());
+    bool groups_ok = EnqueueUplinkInventoryPayload(queue_path, "groups", "/groups", groups.str());
 
     return hardware_ok && os_ok && software_ok && users_ok && groups_ok;
 }

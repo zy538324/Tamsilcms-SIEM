@@ -22,6 +22,8 @@ pub fn route_proto_envelope(
             route_telemetry(TelemetryPayload {
                 stream: "sensor".to_string(),
                 payload_bytes: prost::Message::encoded_len(envelope),
+                event_count: 1,
+                checksum_sha256: None,
             }, policy)
         }
         Some(crate::proto::agent_ipc::envelope::Payload::ExecutionResult(_))
@@ -31,6 +33,8 @@ pub fn route_proto_envelope(
             route_telemetry(TelemetryPayload {
                 stream: "agent".to_string(),
                 payload_bytes: prost::Message::encoded_len(envelope),
+                event_count: 1,
+                checksum_sha256: None,
             }, policy)
         }
         None => false,
